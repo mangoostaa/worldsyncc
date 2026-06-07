@@ -1,0 +1,10 @@
+^C:\USERS\NOXI-PC\OPEN.MP-SDK\WORLDSYNC\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Noxi-PC/open.mp-sdk/WorldSync -BC:/Users/Noxi-PC/open.mp-sdk/WorldSync/build --check-stamp-file C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

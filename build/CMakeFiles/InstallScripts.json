@@ -1,0 +1,13 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/cmake_install.cmake",
+		"C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/sdk/cmake_install.cmake",
+		"C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/sdk/lib/glm/cmake_install.cmake",
+		"C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/sdk/lib/glm/glm/cmake_install.cmake",
+		"C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/sdk/lib/robin-hood-hashing/cmake_install.cmake",
+		"C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/sdk/lib/span-lite/cmake_install.cmake",
+		"C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/sdk/lib/string-view-lite/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
