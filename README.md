@@ -1,192 +1,105 @@
 # WorldSync
 
-WorldSync is an open.mp component/plugin that provides reusable infrastructure for persistent worlds: entity state, dirty tracking, periodic saves, simulation ticks and Pawn natives.
+WorldSync is an open.mp component/plugin for persistent world systems. It gives Pawn scripts a reusable entity layer with persistent state, spatial queries, doors, crops, pathfinding and NPC patrol helpers.
 
-This repository currently contains the first framework slice:
+The goal is to let a gamemode build systems like houses, farms, guarded zones, resources or businesses without rewriting storage and world-state plumbing every time.
 
-- In-memory world entities with type, position, world/interior and key/value state.
-- Dirty tracking for changed entities.
-- Periodic autosave from the open.mp tick loop.
-- SQLite entity loading/saving at `scriptfiles/WorldSync.db` when the open.mp Databases component is loaded.
-- SQLite schema versioning through `worlds_meta.schema_version`.
-- Incremental SQLite saves for dirty entities and deleted IDs.
+## Features
+
+- Persistent entities with `id`, `type`, position, virtual world, interior and key/value state.
+- Dirty tracking and autosave from the open.mp tick loop.
+- SQLite storage at `scriptfiles/WorldSync.db` when the Databases component is loaded.
 - File fallback at `scriptfiles/WorldSync.entities` when Databases is unavailable.
 - Stable entity IDs across server restarts.
-- Pawn natives exposed through `include/worldsync.inc`.
-- A first reusable simulation rule: entities of type `crop` grow from `growth=0` to `growth=100`.
+- Spatial grid queries for nearby entities and nearest-entity lookup.
+- Door module backed by real open.mp objects.
+- Crop module with growth, harvests and ready callbacks.
+- Path node storage, A* routes, route cache and optional visual debug labels.
+- NPC route movement and patrol helpers when the NPC component is loaded.
+- Pawn include at `include/worldsync.inc`.
 
-## Pawn Usage
+## Quick Example
 
 ```pawn
 #include <worldsync>
 
 public OnGameModeInit()
 {
-	for (new i = 0, count = WS_GetEntityCount(); i < count; i++)
-	{
-		new entityid = WS_GetEntityIDAt(i);
-		new type[32];
-		WS_GetEntityType(entityid, type);
-		printf("Loaded WorldSync entity %d (%s)", entityid, type);
-	}
+	WS_SetLogLevel(WS_LOG_INFO);
 
-	new crop = WS_CreateEntity("crop", 1500.0, -1200.0, 20.0);
-	WS_SetState(crop, "growth", "0");
-	WS_SetSimulated(crop, true);
+	new door = WS_CreateDoor(
+		1495,
+		1520.0, -1675.0, 13.5,
+		0.0, 0.0, 0.0,
+		0.0, 0.0, 90.0
+	);
+	WS_SetDoorLocked(door, true);
 
-	printf("WorldSync entities: %d", WS_GetStats(WS_STAT_ENTITIES));
+	new crop = WS_CreateCrop("corn", 1500.0, -1200.0, 20.0, 0.5, 3);
+	printf("Created crop %d, total WorldSync entities: %d", crop, WS_GetEntityCount());
+
+	new nearest = WS_GetNearestEntity(1500.0, -1200.0, 20.0, 0, 0, 30.0, "crop");
+	printf("Nearest crop: %d", nearest);
 	return 1;
 }
 ```
 
-## Natives
+## Documentation
 
-```pawn
-native WS_Load();
-native WS_CreateEntity(const type[], Float:x, Float:y, Float:z, world = 0, interior = 0);
-native WS_DestroyEntity(entityid);
-native bool:WS_EntityExists(entityid);
-native WS_SetState(entityid, const key[], const value[]);
-native WS_GetState(entityid, const key[], value[], size = sizeof(value));
-native WS_GetEntityType(entityid, type[], size = sizeof(type));
-native WS_GetEntityPos(entityid, &Float:x, &Float:y, &Float:z);
-native WS_GetEntityWorld(entityid);
-native WS_GetEntityInterior(entityid);
-native WS_GetEntityCount();
-native WS_GetEntityIDAt(index);
-native WS_SetSimulated(entityid, bool:enabled);
-native WS_Save(bool:dirtyOnly = true);
-native WS_GetStats(stat);
+- [Installation](docs/installation.md)
+- [Complete native reference](docs/natives.md)
+- [15 minute houses, doors and guards guide](docs/quickstart-houses-doors-guards.md)
+- [Example gamemode / filterscript](docs/examples.md)
+- [Release and precompiled build guide](docs/releases.md)
+
+## Example
+
+The main Pawn example is in [examples/worldsync_demo.pwn](examples/worldsync_demo.pwn). It creates:
+
+- A basic house entrance with a persistent door.
+- A crop field with harvest callbacks.
+- Path nodes around a guarded zone.
+- A reusable patrol route for an existing NPC.
+
+## Build
+
+Windows PowerShell:
+
+```powershell
+cd C:\path\to\open.mp-sdk\WorldSync
+$p = $env:Path
+[Environment]::SetEnvironmentVariable('PATH', $null, 'Process')
+[Environment]::SetEnvironmentVariable('Path', $p, 'Process')
+cmake --build build --config Release --target WorldSync
 ```
 
-## Door Module
-
-```pawn
-new door = WS_CreateDoor(1495, 1520.0, -1675.0, 13.5, 0.0, 0.0, 0.0, 0.0, 0.0, 90.0);
-new objectid = WS_GetDoorObject(door);
-WS_SetDoorLocked(door, false);
-WS_SetDoorOpen(door, true);
-
-public OnDoorStateChange(doorid, bool:isOpen)
-{
-	printf("Door %d changed: %d", doorid, isOpen);
-	return 1;
-}
-```
-
-Doors are backed by real open.mp objects. Loaded door entities are rebuilt automatically when WorldSync starts, and `WS_SetDoorOpen` rotates the object between the closed and open rotations.
-
-## Crop Module
-
-```pawn
-new crop = WS_CreateCrop("corn", 1500.0, -1200.0, 20.0, 0.5, 3);
-
-public OnWorldSyncCropReady(cropid)
-{
-	printf("Crop %d is ready", cropid);
-	return 1;
-}
-```
-
-## Pathfinding / NPC AI
-
-WorldSync stores path nodes as persistent entities and uses A* to build routes between connected nodes.
-
-```pawn
-new a = WS_CreatePathNode(1500.0, -1200.0, 20.0);
-new b = WS_CreatePathNode(1520.0, -1200.0, 20.0);
-new c = WS_CreatePathNode(1520.0, -1180.0, 20.0);
-
-WS_ConnectPathNodes(a, b);
-WS_ConnectPathNodes(b, c);
-
-new route = WS_FindPath(a, c);
-for (new i = 0, len = WS_GetPathLength(route); i < len; i++)
-{
-	new Float:x, Float:y, Float:z;
-	WS_GetPathPoint(route, i, x, y, z);
-	printf("Route point %d: %.2f %.2f %.2f", i, x, y, z);
-}
-```
-
-If the open.mp NPC component is loaded, a route can be converted to a native NPC path or assigned directly:
-
-```pawn
-WS_MoveNPCByPath(npcid, route, WS_NPC_MOVE_WALK);
-```
-
-For simple movement, `WS_NPCGoTo` finds the closest node to the NPC and destination, calculates a route, and starts moving:
-
-```pawn
-new route = WS_NPCGoTo(npcid, 1540.0, -1180.0, 20.0, -1, -1, 80.0, WS_NPC_MOVE_WALK);
-```
-
-Path graphs and individual routes can be visualized with text labels when the TextLabels component is loaded:
-
-```pawn
-WS_SetPathDebug(true);      // shows all path nodes and edges
-WS_DebugPathRoute(route);   // shows only one calculated route
-WS_ClearPathDebug();
-```
-
-Route cache avoids recalculating repeated A* requests and is invalidated when nodes or edges change:
-
-```pawn
-printf("Cached routes: %d", WS_GetPathCacheSize());
-WS_ClearPathCache();
-```
-
-Patrols wrap a route into reusable NPC behavior:
-
-```pawn
-new patrol = WS_CreatePatrol(npcid, route, true, WS_NPC_MOVE_WALK);
-WS_StartPatrol(patrol);
-
-public OnWorldSyncPatrolPoint(patrolid, npcid, pointIndex)
-{
-	printf("Patrol %d reached point %d", patrolid, pointIndex);
-	return 1;
-}
-
-public OnWorldSyncPatrolComplete(patrolid, npcid, routeid)
-{
-	printf("Patrol %d completed route %d", patrolid, routeid);
-	return 1;
-}
-```
-
-## Tests
+Tests:
 
 ```powershell
 cmake --build build --config Release --target WorldSyncTests
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-## Logging / Debugging
+The Windows plugin output is:
 
-```pawn
-WS_SetLogLevel(WS_LOG_DEBUG);
-WS_SetDebug(true);
-WS_DebugSummary();
-
-printf("Dirty entities: %d", WS_GetStats(WS_STAT_DIRTY_ENTITIES));
-printf("Last saved entities: %d", WS_GetStats(WS_STAT_LAST_SAVE_COUNT));
-printf("Last changed entities: %d", WS_GetStats(WS_STAT_LAST_SAVE_CHANGED));
+```text
+build/Release/WorldSync.dll
 ```
 
-Log levels:
+## Storage
 
-```pawn
-WS_LOG_ERROR
-WS_LOG_WARNING
-WS_LOG_INFO
-WS_LOG_DEBUG
+WorldSync tries SQLite first. If the open.mp Databases component is loaded, data is stored at:
+
+```text
+scriptfiles/WorldSync.db
 ```
 
-## Roadmap
+If Databases is not loaded, WorldSync uses:
 
-- Add migration steps for future schema versions.
-- Add typed components for vehicles, businesses, resources and production chains.
-- Add higher-level NPC routines such as workers and player following.
-- Add Pawn callbacks for simulation events such as crop ready, stock changed or production completed.
-- Add tests for the core simulation and persistence layer.
+```text
+scriptfiles/WorldSync.entities
+```
+
+## Status
+
+This repository is ready for early adoption testing. The public Pawn API is usable, but future releases may add schema migrations and more typed modules for vehicles, businesses, production chains and richer NPC routines.
