@@ -143,6 +143,7 @@ void testPathModuleAStar()
 
 	const int route = paths.findPath(a, c);
 	assert(route != 0);
+	assert(paths.routeCacheSize() == 1);
 	assert(paths.routeLength(route) == 3);
 	assert(paths.routeNode(route, 0) == a);
 	assert(paths.routeNode(route, 1) == b);
@@ -154,6 +155,14 @@ void testPathModuleAStar()
 
 	assert(paths.destroyRoute(route));
 	assert(paths.routeLength(route) == 0);
+
+	const int cachedRoute = paths.findPath(a, c);
+	assert(cachedRoute != 0);
+	assert(paths.routeCacheSize() == 1);
+	assert(paths.routeLength(cachedRoute) == 3);
+
+	assert(paths.disconnectNodes(b, c, true));
+	assert(paths.routeCacheSize() == 0);
 }
 } // namespace
 

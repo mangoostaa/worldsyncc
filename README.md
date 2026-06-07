@@ -129,6 +129,13 @@ WS_DebugPathRoute(route);   // shows only one calculated route
 WS_ClearPathDebug();
 ```
 
+Route cache avoids recalculating repeated A* requests and is invalidated when nodes or edges change:
+
+```pawn
+printf("Cached routes: %d", WS_GetPathCacheSize());
+WS_ClearPathCache();
+```
+
 Patrols wrap a route into reusable NPC behavior:
 
 ```pawn

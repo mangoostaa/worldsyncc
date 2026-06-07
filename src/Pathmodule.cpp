@@ -85,6 +85,7 @@ PathModule::~PathModule()
 
 int PathModule::createNode(Vec3 position, int virtualWorld, int interior)
 {
+	invalidateRouteCache();
 	return core_.createEntity(PATH_NODE_TYPE, position, virtualWorld, interior);
 }
 
@@ -104,6 +105,10 @@ bool PathModule::connectNodes(int fromNode, int toNode, bool bidirectional, floa
 	const float finalCost = cost > 0.0f ? cost : distance(fromNode, toNode);
 	const bool forward = upsertEdge(fromNode, toNode, finalCost);
 	const bool backward = !bidirectional || upsertEdge(toNode, fromNode, finalCost);
+	if (forward && backward)
+	{
+		invalidateRouteCache();
+	}
 	return forward && backward;
 }
 
@@ -116,6 +121,10 @@ bool PathModule::disconnectNodes(int fromNode, int toNode, bool bidirectional)
 
 	const bool forward = removeEdge(fromNode, toNode);
 	const bool backward = !bidirectional || removeEdge(toNode, fromNode);
+	if (forward || backward)
+	{
+		invalidateRouteCache();
+	}
 	return forward || backward;
 }
 
@@ -154,9 +163,14 @@ int PathModule::findPath(int startNode, int endNode)
 	}
 	if (startNode == endNode)
 	{
-		const int routeID = nextRouteID_++;
-		routes_[routeID] = Route { routeID, { startNode } };
-		return routeID;
+		return storeRoute({ startNode });
+	}
+
+	const std::string cacheKey = routeCacheKey(startNode, endNode);
+	const auto cached = routeCache_.find(cacheKey);
+	if (cached != routeCache_.end())
+	{
+		return storeRoute(cached->second);
 	}
 
 	std::priority_queue<OpenNode> open;
@@ -187,9 +201,8 @@ int PathModule::findPath(int startNode, int endNode)
 			}
 			std::reverse(nodes.begin(), nodes.end());
 
-			const int routeID = nextRouteID_++;
-			routes_[routeID] = Route { routeID, std::move(nodes) };
-			return routeID;
+			routeCache_[cacheKey] = nodes;
+			return storeRoute(std::move(nodes));
 		}
 
 		closed.insert(current);
@@ -216,6 +229,16 @@ int PathModule::findPath(int startNode, int endNode)
 bool PathModule::destroyRoute(int routeID)
 {
 	return routes_.erase(routeID) > 0;
+}
+
+void PathModule::clearRouteCache()
+{
+	routeCache_.clear();
+}
+
+int PathModule::routeCacheSize() const
+{
+	return static_cast<int>(routeCache_.size());
 }
 
 int PathModule::routeLength(int routeID) const
@@ -788,6 +811,27 @@ bool PathModule::startPatrol(Patrol& patrol)
 	return patrol.active;
 }
 
+void PathModule::invalidateRouteCache()
+{
+	if (!routeCache_.empty() && omp_)
+	{
+		omp_->printLn("[WorldSync/Path] Route cache invalidated (%d entries).", static_cast<int>(routeCache_.size()));
+	}
+	routeCache_.clear();
+}
+
+std::string PathModule::routeCacheKey(int startNode, int endNode) const
+{
+	return std::to_string(startNode) + ":" + std::to_string(endNode);
+}
+
+int PathModule::storeRoute(std::vector<int> nodes)
+{
+	const int routeID = nextRouteID_++;
+	routes_[routeID] = Route { routeID, std::move(nodes) };
+	return routeID;
+}
+
 static PathModule* s_pathModule = nullptr;
 
 static cell AMX_NATIVE_CALL n_WS_CreatePathNode(AMX*, cell* params)
@@ -826,6 +870,18 @@ static cell AMX_NATIVE_CALL n_WS_DestroyPath(AMX*, cell* params)
 {
 	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->destroyRoute(static_cast<int>(params[1])) ? 1 : 0;
+}
+
+static cell AMX_NATIVE_CALL n_WS_ClearPathCache(AMX*, cell*)
+{
+	if (!s_pathModule) return 0;
+	s_pathModule->clearRouteCache();
+	return 1;
+}
+
+static cell AMX_NATIVE_CALL n_WS_GetPathCacheSize(AMX*, cell*)
+{
+	return s_pathModule ? s_pathModule->routeCacheSize() : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetPathLength(AMX*, cell* params)
@@ -970,6 +1026,8 @@ static const AMX_NATIVE_INFO PathNatives[] = {
 	{ "WS_GetNearestPathNode", n_WS_GetNearestPathNode },
 	{ "WS_FindPath", n_WS_FindPath },
 	{ "WS_DestroyPath", n_WS_DestroyPath },
+	{ "WS_ClearPathCache", n_WS_ClearPathCache },
+	{ "WS_GetPathCacheSize", n_WS_GetPathCacheSize },
 	{ "WS_GetPathLength", n_WS_GetPathLength },
 	{ "WS_GetPathNode", n_WS_GetPathNode },
 	{ "WS_GetPathPoint", n_WS_GetPathPoint },

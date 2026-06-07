@@ -71,6 +71,8 @@ native WS_DisconnectPathNodes(fromNode, toNode, bool:bidirectional = true);
 native WS_GetNearestPathNode(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0);
 native WS_FindPath(startNode, endNode);
 native WS_DestroyPath(pathid);
+native WS_ClearPathCache();
+native WS_GetPathCacheSize();
 native WS_GetPathLength(pathid);
 native WS_GetPathNode(pathid, index);
 native WS_GetPathPoint(pathid, index, &Float:x, &Float:y, &Float:z);

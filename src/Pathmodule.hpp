@@ -6,6 +6,7 @@
 #include <Server/Components/Pawn/pawn.hpp>
 #include <Server/Components/TextLabels/textlabels.hpp>
 #include <sdk.hpp>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -64,6 +65,8 @@ public:
 
 	int findPath(int startNode, int endNode);
 	bool destroyRoute(int routeID);
+	void clearRouteCache();
+	int routeCacheSize() const;
 	int routeLength(int routeID) const;
 	int routeNode(int routeID, int index) const;
 	bool routePoint(int routeID, int index, Vec3& out) const;
@@ -98,6 +101,9 @@ private:
 	const Patrol* findPatrol(int patrolID) const;
 	Patrol* findPatrolByNPCPath(int npcPathID);
 	bool startPatrol(Patrol& patrol);
+	void invalidateRouteCache();
+	std::string routeCacheKey(int startNode, int endNode) const;
+	int storeRoute(std::vector<int> nodes);
 
 	std::vector<PathEdge> getEdges(int nodeID) const;
 	void setEdges(int nodeID, const std::vector<PathEdge>& edges);
@@ -117,6 +123,7 @@ private:
 	int nextRouteID_ = 1;
 	int nextPatrolID_ = 1;
 	std::unordered_map<int, Route> routes_;
+	std::unordered_map<std::string, std::vector<int>> routeCache_;
 	std::unordered_map<int, Patrol> patrols_;
 	std::vector<int> debugLabelIDs_;
 	bool pathDebugEnabled_ = false;
