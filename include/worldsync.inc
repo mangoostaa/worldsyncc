@@ -58,6 +58,19 @@ native WS_GetDoorObject(doorid);
 native WS_GetDoorPos(doorid, &Float:x, &Float:y, &Float:z);
 native WS_GetDoorRot(doorid, &Float:rx, &Float:ry, &Float:rz, &Float:open_rx, &Float:open_ry, &Float:open_rz);
 
+native WS_CreateVehicle(model, Float:x, Float:y, Float:z, Float:zRot = 0.0, colour1 = -1, colour2 = -1, respawnDelay = -1, bool:siren = false, virtualworld = 0, interior = 0);
+native WS_DestroyVehicle(vehicleEntityID);
+native WS_GetVehicleID(vehicleEntityID);
+native WS_GetVehicleModel(vehicleEntityID);
+native WS_GetVehiclePos(vehicleEntityID, &Float:x, &Float:y, &Float:z);
+native Float:WS_GetVehicleZRot(vehicleEntityID);
+native WS_SetVehicleHealth(vehicleEntityID, Float:health);
+native Float:WS_GetVehicleHealth(vehicleEntityID);
+native WS_SetVehicleColours(vehicleEntityID, colour1, colour2);
+native WS_GetVehicleColours(vehicleEntityID, &colour1, &colour2);
+native WS_RespawnVehicle(vehicleEntityID);
+native WS_RepairVehicle(vehicleEntityID);
+
 native WS_CreateCrop(const species[], Float:x, Float:y, Float:z, Float:growthRate = 1.0, maxHarvests = 0, virtualworld = 0, interior = 0);
 native WS_DestroyCrop(cropid);
 native WS_GetCropGrowth(cropid);

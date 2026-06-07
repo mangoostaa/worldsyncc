@@ -86,6 +86,23 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 | `WS_GetCropHarvests(cropid)` | Returns current harvest count. | `cropid`: crop ID. | `new h = WS_GetCropHarvests(c);` |
 | `WS_GetCropSpecies(cropid, species[], size = sizeof(species))` | Reads crop species. | Output buffer. | `new s[24]; WS_GetCropSpecies(c, s);` |
 
+## Vehicle Natives
+
+| Native | Description | Parameters | Example |
+| --- | --- | --- | --- |
+| `WS_CreateVehicle(model, Float:x, Float:y, Float:z, Float:zRot = 0.0, colour1 = -1, colour2 = -1, respawnDelay = -1, bool:siren = false, virtualworld = 0, interior = 0)` | Creates a persistent vehicle entity and a real open.mp vehicle if the Vehicles component is loaded. | Model, position, Z rotation, colours, respawn delay, siren, scope. | `new v = WS_CreateVehicle(411, x, y, z, 90.0, 1, 1);` |
+| `WS_DestroyVehicle(vehicleEntityID)` | Destroys the persistent vehicle and releases its runtime vehicle. | `vehicleEntityID`: WorldSync vehicle entity ID. | `WS_DestroyVehicle(v);` |
+| `WS_GetVehicleID(vehicleEntityID)` | Returns the backing open.mp vehicle ID, or `0` if not spawned. | `vehicleEntityID`: WorldSync vehicle entity ID. | `new sampveh = WS_GetVehicleID(v);` |
+| `WS_GetVehicleModel(vehicleEntityID)` | Returns the model ID stored for the vehicle. | `vehicleEntityID`: WorldSync vehicle entity ID. | `new model = WS_GetVehicleModel(v);` |
+| `WS_GetVehiclePos(vehicleEntityID, &Float:x, &Float:y, &Float:z)` | Reads the persisted spawn position. | Output references. | `WS_GetVehiclePos(v, x, y, z);` |
+| `Float:WS_GetVehicleZRot(vehicleEntityID)` | Returns persisted spawn Z rotation. | `vehicleEntityID`: WorldSync vehicle entity ID. | `new Float:rot = WS_GetVehicleZRot(v);` |
+| `WS_SetVehicleHealth(vehicleEntityID, Float:health)` | Persists health and applies it to the runtime vehicle if spawned. | Health value. | `WS_SetVehicleHealth(v, 850.0);` |
+| `Float:WS_GetVehicleHealth(vehicleEntityID)` | Returns runtime health when available, otherwise persisted health. | `vehicleEntityID`: WorldSync vehicle entity ID. | `new Float:hp = WS_GetVehicleHealth(v);` |
+| `WS_SetVehicleColours(vehicleEntityID, colour1, colour2)` | Persists and applies vehicle colours. | Two GTA colour IDs. | `WS_SetVehicleColours(v, 3, 6);` |
+| `WS_GetVehicleColours(vehicleEntityID, &colour1, &colour2)` | Reads persisted colours. | Output references. | `WS_GetVehicleColours(v, c1, c2);` |
+| `WS_RespawnVehicle(vehicleEntityID)` | Respawns the runtime vehicle or creates it if missing. | `vehicleEntityID`: WorldSync vehicle entity ID. | `WS_RespawnVehicle(v);` |
+| `WS_RepairVehicle(vehicleEntityID)` | Repairs the runtime vehicle and updates persisted health. | `vehicleEntityID`: WorldSync vehicle entity ID. | `WS_RepairVehicle(v);` |
+
 ## Pathfinding And NPC Natives
 
 | Native | Description | Parameters | Example |

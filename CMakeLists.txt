@@ -10,6 +10,7 @@ add_library(WorldSync SHARED
     src/Doormodule.cpp
     src/Cropmodule.cpp
     src/Pathmodule.cpp
+    src/Vehiclemodule.cpp
 )
 
 target_link_libraries(WorldSync PUBLIC OMP-SDK)
@@ -23,6 +24,7 @@ add_executable(WorldSyncTests
     src/WorldSync.cpp
     src/Cropmodule.cpp
     src/Pathmodule.cpp
+    src/Vehiclemodule.cpp
 )
 
 target_link_libraries(WorldSyncTests PRIVATE OMP-SDK)

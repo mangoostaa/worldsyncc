@@ -3,6 +3,7 @@
 
 new gHouseDoor;
 new gHouseCrop;
+new gHouseVehicle;
 new gGuardRoute;
 new gGuardPatrol;
 
@@ -32,6 +33,13 @@ stock WorldSyncDemo_CreateFarm()
 	gHouseCrop = WS_CreateCrop("corn", 1510.0, -1688.0, 13.5, 0.35, 5);
 	printf("[WorldSyncDemo] Crop entity: %d", gHouseCrop);
 	return gHouseCrop;
+}
+
+stock WorldSyncDemo_CreateVehicle()
+{
+	gHouseVehicle = WS_CreateVehicle(411, 1528.0, -1680.0, 13.4, 90.0, 1, 1);
+	printf("[WorldSyncDemo] Vehicle entity: %d runtime: %d", gHouseVehicle, WS_GetVehicleID(gHouseVehicle));
+	return gHouseVehicle;
 }
 
 stock WorldSyncDemo_CreateGuardRoute()
@@ -93,6 +101,7 @@ public OnGameModeInit()
 
 	WorldSyncDemo_CreateHouseDoor();
 	WorldSyncDemo_CreateFarm();
+	WorldSyncDemo_CreateVehicle();
 	WorldSyncDemo_CreateGuardRoute();
 
 	WorldSyncDemo_PrintNearbyCrops(1510.0, -1688.0, 13.5);

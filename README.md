@@ -14,6 +14,7 @@ The goal is to let a gamemode build systems like houses, farms, guarded zones, r
 - Spatial grid queries for nearby entities and nearest-entity lookup.
 - General Pawn callbacks for entity creation, destruction, state changes, load and save.
 - Door module backed by real open.mp objects.
+- Vehicle module backed by real open.mp vehicles.
 - Crop module with growth, harvests and ready callbacks.
 - Path node storage, A* routes, route cache and optional visual debug labels.
 - NPC route movement and patrol helpers when the NPC component is loaded.
@@ -35,6 +36,9 @@ public OnGameModeInit()
 		0.0, 0.0, 90.0
 	);
 	WS_SetDoorLocked(door, true);
+
+	new car = WS_CreateVehicle(411, 1528.0, -1680.0, 13.4, 90.0, 1, 1);
+	printf("Created persistent vehicle entity %d runtime %d", car, WS_GetVehicleID(car));
 
 	new crop = WS_CreateCrop("corn", 1500.0, -1200.0, 20.0, 0.5, 3);
 	printf("Created crop %d, total WorldSync entities: %d", crop, WS_GetEntityCount());

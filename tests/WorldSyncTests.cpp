@@ -1,5 +1,6 @@
 #include "Cropmodule.hpp"
 #include "Pathmodule.hpp"
+#include "Vehiclemodule.hpp"
 #include "WorldSync.hpp"
 
 #include <cassert>
@@ -232,6 +233,33 @@ void testCropModuleGrowthAndHarvest()
 	assert(!core.hasEntity(crop));
 }
 
+void testVehicleModulePersistenceFallback()
+{
+	cleanStorage();
+
+	worlds::WorldSyncCore core;
+	worlds::VehicleModule vehicles(core, nullptr, nullptr, nullptr);
+	const int vehicle = vehicles.createVehicle(411, worlds::Vec3 { 1.0f, 2.0f, 3.0f }, 90.0f, 1, 2, -1, false);
+
+	assert(vehicle == 1);
+	assert(core.hasEntity(vehicle));
+	assert(vehicles.isVehicle(vehicle));
+	assert(vehicles.getRuntimeVehicleID(vehicle) == 0);
+	assert(vehicles.getModel(vehicle) == 411);
+	assertNear(vehicles.getZRotation(vehicle), 90.0f);
+
+	int colour1 = -1;
+	int colour2 = -1;
+	assert(vehicles.getColours(vehicle, colour1, colour2));
+	assert(colour1 == 1);
+	assert(colour2 == 2);
+
+	assert(vehicles.setHealth(vehicle, 850.0f));
+	assertNear(vehicles.getHealth(vehicle), 850.0f);
+	assert(vehicles.destroyVehicle(vehicle));
+	assert(!core.hasEntity(vehicle));
+}
+
 void testPathModuleAStar()
 {
 	cleanStorage();
@@ -283,6 +311,7 @@ int main()
 	testSpatialGridQueries();
 	testCoreEventCallbacks();
 	testCropModuleGrowthAndHarvest();
+	testVehicleModulePersistenceFallback();
 	testPathModuleAStar();
 
 	std::cout << "WorldSync unit tests passed\n";

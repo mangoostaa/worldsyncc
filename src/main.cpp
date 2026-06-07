@@ -3,12 +3,14 @@
 #include "Doormodule.hpp"
 #include "Cropmodule.hpp"
 #include "Pathmodule.hpp"
+#include "Vehiclemodule.hpp"
 
 #include <Server/Components/Pawn/pawn.hpp>
 #include <Server/Components/Objects/objects.hpp>
 #include <Server/Components/NPCs/npcs.hpp>
 #include <Server/Components/Databases/databases.hpp>
 #include <Server/Components/TextLabels/textlabels.hpp>
+#include <Server/Components/Vehicles/vehicles.hpp>
 
 #include <algorithm>
 #include <memory>
@@ -455,11 +457,13 @@ public:
 		npcs_ = components->queryComponent<INPCComponent>();
 		databases_ = components->queryComponent<IDatabasesComponent>();
 		textLabels_ = components->queryComponent<ITextLabelsComponent>();
+		vehicles_ = components->queryComponent<IVehiclesComponent>();
 		world_.setDatabaseComponent(databases_);
 		gPawn = pawn_;
 		doorModule_ = std::make_unique<worlds::DoorModule>(world_, pawn_, objects_, core_);
 		cropModule_ = std::make_unique<worlds::CropModule>(world_, pawn_, core_);
 		pathModule_ = std::make_unique<worlds::PathModule>(world_, pawn_, npcs_, textLabels_, core_);
+		vehicleModule_ = std::make_unique<worlds::VehicleModule>(world_, pawn_, vehicles_, core_);
 		if (pawn_)
 		{
 			pawn_->getEventDispatcher().addEventHandler(this);
@@ -484,6 +488,10 @@ public:
 		{
 			core_->logLn(LogLevel::Warning, "WorldSync: no se encontro el componente TextLabels; debug visual de pathfinding desactivado.");
 		}
+		if (!vehicles_ && core_)
+		{
+			core_->logLn(LogLevel::Warning, "WorldSync: no se encontro el componente Vehicles; los vehiculos se guardaran pero no se spawnearan.");
+		}
 	}
 
 	void onReady() override
@@ -494,6 +502,10 @@ public:
 			if (doorModule_)
 			{
 				doorModule_->rebuildObjects();
+			}
+			if (vehicleModule_)
+			{
+				vehicleModule_->rebuildVehicles();
 			}
 			const worlds::Stats stats = world_.stats();
 			core_->printLn("WorldSync listo: %d entidades cargadas, persistencia %s.", stats.entities, loaded ? "activa" : "sin archivo previo");
@@ -524,6 +536,10 @@ public:
 		if (pathModule_)
 		{
 			pathModule_->registerNatives(script);
+		}
+		if (vehicleModule_)
+		{
+			vehicleModule_->registerNatives(script);
 		}
 	}
 
@@ -603,10 +619,12 @@ private:
 	INPCComponent* npcs_ = nullptr;
 	IDatabasesComponent* databases_ = nullptr;
 	ITextLabelsComponent* textLabels_ = nullptr;
+	IVehiclesComponent* vehicles_ = nullptr;
 	worlds::WorldSyncCore world_;
 	std::unique_ptr<worlds::DoorModule> doorModule_;
 	std::unique_ptr<worlds::CropModule> cropModule_;
 	std::unique_ptr<worlds::PathModule> pathModule_;
+	std::unique_ptr<worlds::VehicleModule> vehicleModule_;
 };
 
 COMPONENT_ENTRY_POINT()
