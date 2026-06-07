@@ -46,6 +46,17 @@ struct Stats
 	int lastSaveChanged = 0;
 };
 
+class WorldSyncEventHandler
+{
+public:
+	virtual ~WorldSyncEventHandler() = default;
+	virtual void onEntityCreated(const Entity& entity) {}
+	virtual void onEntityDestroyed(int entityID, const std::string& type) {}
+	virtual void onEntityStateChanged(const Entity& entity, const std::string& key, const std::string& oldValue, const std::string& newValue) {}
+	virtual void onWorldLoaded(int entityCount, bool storageAvailable) {}
+	virtual void onWorldSaved(int entityCount, int changedCount, bool dirtyOnly) {}
+};
+
 enum class LogLevelFilter
 {
 	Error = 0,
@@ -63,6 +74,8 @@ public:
 	void setDebugEnabled(bool enabled);
 	bool isDebugEnabled() const { return debugEnabled_; }
 	void log(LogLevelFilter level, const char* fmt, ...) const;
+	void addEventHandler(WorldSyncEventHandler* handler);
+	void removeEventHandler(WorldSyncEventHandler* handler);
 
 	void setDatabaseComponent(IDatabasesComponent* databases);
 	void closeStorage();
@@ -117,6 +130,11 @@ private:
 	void addToSpatialGrid(const Entity& entity);
 	void removeFromSpatialGrid(const Entity& entity);
 	void rebuildSpatialGrid();
+	void fireEntityCreated(const Entity& entity);
+	void fireEntityDestroyed(int entityID, const std::string& type);
+	void fireEntityStateChanged(const Entity& entity, const std::string& key, const std::string& oldValue, const std::string& newValue);
+	void fireWorldLoaded(bool storageAvailable);
+	void fireWorldSaved(int changedCount, bool dirtyOnly);
 	void simulateEntity(Entity& entity, std::chrono::milliseconds elapsed);
 	int writeSnapshot(bool dirtyOnly);
 	bool parseSnapshotLine(const std::string& line, Entity& entity) const;
@@ -130,6 +148,7 @@ private:
 
 	std::vector<Entity> entities_;
 	std::unordered_map<SpatialCell, std::vector<int>, SpatialCellHash> spatialGrid_;
+	std::vector<WorldSyncEventHandler*> eventHandlers_;
 	IDatabasesComponent* databases_ = nullptr;
 	IDatabaseConnection* database_ = nullptr;
 	ILogger* logger_ = nullptr;

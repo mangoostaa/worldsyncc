@@ -12,6 +12,53 @@
 
 namespace
 {
+struct EventRecorder final : worlds::WorldSyncEventHandler
+{
+	int created = 0;
+	int destroyed = 0;
+	int stateChanged = 0;
+	int loaded = 0;
+	int saved = 0;
+	int lastEntity = 0;
+	std::string lastType;
+	std::string lastKey;
+	std::string lastOldValue;
+	std::string lastNewValue;
+
+	void onEntityCreated(const worlds::Entity& entity) override
+	{
+		++created;
+		lastEntity = entity.id;
+		lastType = entity.type;
+	}
+
+	void onEntityDestroyed(int entityID, const std::string& type) override
+	{
+		++destroyed;
+		lastEntity = entityID;
+		lastType = type;
+	}
+
+	void onEntityStateChanged(const worlds::Entity& entity, const std::string& key, const std::string& oldValue, const std::string& newValue) override
+	{
+		++stateChanged;
+		lastEntity = entity.id;
+		lastKey = key;
+		lastOldValue = oldValue;
+		lastNewValue = newValue;
+	}
+
+	void onWorldLoaded(int, bool) override
+	{
+		++loaded;
+	}
+
+	void onWorldSaved(int, int, bool) override
+	{
+		++saved;
+	}
+};
+
 void cleanStorage()
 {
 	std::filesystem::remove("scriptfiles/WorldSync.entities");
@@ -122,6 +169,43 @@ void testSpatialGridQueries()
 	assert(core.findNearestEntity(worlds::Vec3 { 8.0f, 0.0f, 0.0f }, 0, 0, 50.0f, "crop") == 0);
 }
 
+void testCoreEventCallbacks()
+{
+	cleanStorage();
+
+	worlds::WorldSyncCore core;
+	EventRecorder events;
+	core.addEventHandler(&events);
+
+	const int entity = core.createEntity("stash", worlds::Vec3 { 1.0f, 2.0f, 3.0f }, 0, 0);
+	assert(events.created == 1);
+	assert(events.lastEntity == entity);
+	assert(events.lastType == "stash");
+
+	assert(core.setState(entity, "owner", "10"));
+	assert(events.stateChanged == 1);
+	assert(events.lastKey == "owner");
+	assert(events.lastOldValue.empty());
+	assert(events.lastNewValue == "10");
+
+	assert(core.setState(entity, "owner", "11"));
+	assert(events.stateChanged == 2);
+	assert(events.lastOldValue == "10");
+	assert(events.lastNewValue == "11");
+
+	assert(core.saveAll() == 1);
+	assert(events.saved == 1);
+
+	assert(core.destroyEntity(entity));
+	assert(events.destroyed == 1);
+	assert(events.lastEntity == entity);
+	assert(events.lastType == "stash");
+
+	core.removeEventHandler(&events);
+	core.createEntity("silent", worlds::Vec3 {}, 0, 0);
+	assert(events.created == 1);
+}
+
 void testCropModuleGrowthAndHarvest()
 {
 	cleanStorage();
@@ -197,6 +281,7 @@ int main()
 	testCoreEntityLifecycle();
 	testFallbackPersistenceRoundTrip();
 	testSpatialGridQueries();
+	testCoreEventCallbacks();
 	testCropModuleGrowthAndHarvest();
 	testPathModuleAStar();
 

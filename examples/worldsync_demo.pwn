@@ -106,6 +106,39 @@ public OnDoorStateChange(doorid, bool:isOpen)
 	return 1;
 }
 
+public OnWorldSyncEntityCreated(entityid, const type[])
+{
+	printf("[WorldSyncDemo] Entity created: id=%d type=%s", entityid, type);
+	return 1;
+}
+
+public OnWorldSyncEntityDestroyed(entityid, const type[])
+{
+	printf("[WorldSyncDemo] Entity destroyed: id=%d type=%s", entityid, type);
+	return 1;
+}
+
+public OnWorldSyncEntityStateChange(entityid, const key[], const oldValue[], const newValue[])
+{
+	if (!strcmp(key, "growth") || !strcmp(key, "open") || !strcmp(key, "locked"))
+	{
+		printf("[WorldSyncDemo] Entity %d state %s: %s -> %s", entityid, key, oldValue, newValue);
+	}
+	return 1;
+}
+
+public OnWorldSyncLoaded(entityCount, bool:storageAvailable)
+{
+	printf("[WorldSyncDemo] Loaded entities=%d storage=%d", entityCount, storageAvailable);
+	return 1;
+}
+
+public OnWorldSyncSaved(entityCount, changedCount, bool:dirtyOnly)
+{
+	printf("[WorldSyncDemo] Saved entities=%d changed=%d dirtyOnly=%d", entityCount, changedCount, dirtyOnly);
+	return 1;
+}
+
 public OnWorldSyncCropReady(cropid)
 {
 	new species[24];

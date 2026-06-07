@@ -121,15 +121,39 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 
 ```pawn
 forward OnDoorStateChange(doorid, bool:isOpen);
+forward OnWorldSyncEntityCreated(entityid, const type[]);
+forward OnWorldSyncEntityDestroyed(entityid, const type[]);
+forward OnWorldSyncEntityStateChange(entityid, const key[], const oldValue[], const newValue[]);
+forward OnWorldSyncLoaded(entityCount, bool:storageAvailable);
+forward OnWorldSyncSaved(entityCount, changedCount, bool:dirtyOnly);
 forward OnWorldSyncCropReady(cropid);
 forward OnWorldSyncPatrolStart(patrolid, npcid, routeid);
 forward OnWorldSyncPatrolPoint(patrolid, npcid, pointIndex);
 forward OnWorldSyncPatrolComplete(patrolid, npcid, routeid);
 ```
 
+| Callback | Description |
+| --- | --- |
+| `OnDoorStateChange(doorid, bool:isOpen)` | Called when a WorldSync door opens or closes. |
+| `OnWorldSyncEntityCreated(entityid, const type[])` | Called after a new entity is created by any module. |
+| `OnWorldSyncEntityDestroyed(entityid, const type[])` | Called after an entity is destroyed. The entity no longer exists, so the type is passed directly. |
+| `OnWorldSyncEntityStateChange(entityid, const key[], const oldValue[], const newValue[])` | Called after `WS_SetState` or a module state update. Can be frequent for simulated systems. |
+| `OnWorldSyncLoaded(entityCount, bool:storageAvailable)` | Called after a load attempt. `storageAvailable` is false when no previous storage exists. |
+| `OnWorldSyncSaved(entityCount, changedCount, bool:dirtyOnly)` | Called after a successful save. |
+| `OnWorldSyncCropReady(cropid)` | Called when a crop reaches 100 growth for the current cycle. |
+| `OnWorldSyncPatrolStart(patrolid, npcid, routeid)` | Called when a patrol starts moving. |
+| `OnWorldSyncPatrolPoint(patrolid, npcid, pointIndex)` | Called when a patrol reaches a route point. |
+| `OnWorldSyncPatrolComplete(patrolid, npcid, routeid)` | Called when a patrol route completes. |
+
 Example:
 
 ```pawn
+public OnWorldSyncEntityStateChange(entityid, const key[], const oldValue[], const newValue[])
+{
+	printf("Entity %d state changed: %s %s -> %s", entityid, key, oldValue, newValue);
+	return 1;
+}
+
 public OnWorldSyncCropReady(cropid)
 {
 	new species[24];

@@ -124,6 +124,28 @@ int fillPawnArray(AMX* amx, cell address, const std::vector<int>& values, int ma
 	return written;
 }
 
+template <typename Invoker>
+void callPawnScripts(IPawnComponent* pawn, const char* callback, Invoker invoker)
+{
+	if (!pawn)
+	{
+		return;
+	}
+
+	IPawnScript* mainScript = pawn->mainScript();
+	if (mainScript)
+	{
+		invoker(mainScript, callback);
+	}
+	for (IPawnScript* script : pawn->sideScripts())
+	{
+		if (script)
+		{
+			invoker(script, callback);
+		}
+	}
+}
+
 cell AMX_NATIVE_CALL WS_Load(AMX*, cell*)
 {
 	return gWorld && gWorld->load() ? 1 : 0;
@@ -404,7 +426,7 @@ const AMX_NATIVE_INFO WorldSyncNatives[] = {
 };
 } // namespace
 
-class WorldSync final : public IComponent, public CoreEventHandler, public PawnEventHandler
+class WorldSync final : public IComponent, public CoreEventHandler, public PawnEventHandler, public worlds::WorldSyncEventHandler
 {
 public:
 	PROVIDE_UID(0x1c3f8af9876d4201);
@@ -420,6 +442,7 @@ public:
 	{
 		core_ = c;
 		world_.setLogger(core_);
+		world_.addEventHandler(this);
 		gWorld = &world_;
 		core_->getEventDispatcher().addEventHandler(this);
 		core_->printLn("WorldSync v0.1.0 cargado.");
@@ -510,6 +533,7 @@ public:
 
 	void onFree(IComponent*) override
 	{
+		world_.removeEventHandler(this);
 		if (pawn_)
 		{
 			pawn_->getEventDispatcher().removeEventHandler(this);
@@ -530,6 +554,46 @@ public:
 	void reset() override
 	{
 		world_.reset();
+	}
+
+	void onEntityCreated(const worlds::Entity& entity) override
+	{
+		const StringView type(entity.type.data(), entity.type.size());
+		callPawnScripts(pawn_, "OnWorldSyncEntityCreated", [entityID = entity.id, type](IPawnScript* script, const char* callback) {
+			script->Call(callback, DefaultReturnValue_True, entityID, type);
+		});
+	}
+
+	void onEntityDestroyed(int entityID, const std::string& typeValue) override
+	{
+		const StringView type(typeValue.data(), typeValue.size());
+		callPawnScripts(pawn_, "OnWorldSyncEntityDestroyed", [entityID, type](IPawnScript* script, const char* callback) {
+			script->Call(callback, DefaultReturnValue_True, entityID, type);
+		});
+	}
+
+	void onEntityStateChanged(const worlds::Entity& entity, const std::string& keyValue, const std::string& oldValue, const std::string& newValue) override
+	{
+		const StringView key(keyValue.data(), keyValue.size());
+		const StringView oldState(oldValue.data(), oldValue.size());
+		const StringView newState(newValue.data(), newValue.size());
+		callPawnScripts(pawn_, "OnWorldSyncEntityStateChange", [entityID = entity.id, key, oldState, newState](IPawnScript* script, const char* callback) {
+			script->Call(callback, DefaultReturnValue_True, entityID, key, oldState, newState);
+		});
+	}
+
+	void onWorldLoaded(int entityCount, bool storageAvailable) override
+	{
+		callPawnScripts(pawn_, "OnWorldSyncLoaded", [entityCount, storageAvailable](IPawnScript* script, const char* callback) {
+			script->Call(callback, DefaultReturnValue_True, entityCount, storageAvailable ? 1 : 0);
+		});
+	}
+
+	void onWorldSaved(int entityCount, int changedCount, bool dirtyOnly) override
+	{
+		callPawnScripts(pawn_, "OnWorldSyncSaved", [entityCount, changedCount, dirtyOnly](IPawnScript* script, const char* callback) {
+			script->Call(callback, DefaultReturnValue_True, entityCount, changedCount, dirtyOnly ? 1 : 0);
+		});
 	}
 
 private:

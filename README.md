@@ -12,6 +12,7 @@ The goal is to let a gamemode build systems like houses, farms, guarded zones, r
 - File fallback at `scriptfiles/WorldSync.entities` when Databases is unavailable.
 - Stable entity IDs across server restarts.
 - Spatial grid queries for nearby entities and nearest-entity lookup.
+- General Pawn callbacks for entity creation, destruction, state changes, load and save.
 - Door module backed by real open.mp objects.
 - Crop module with growth, harvests and ready callbacks.
 - Path node storage, A* routes, route cache and optional visual debug labels.

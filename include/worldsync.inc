@@ -96,6 +96,11 @@ native WS_GetPatrolRoute(patrolid);
 native WS_GetPatrolNPC(patrolid);
 
 forward OnDoorStateChange(doorid, bool:isOpen);
+forward OnWorldSyncEntityCreated(entityid, const type[]);
+forward OnWorldSyncEntityDestroyed(entityid, const type[]);
+forward OnWorldSyncEntityStateChange(entityid, const key[], const oldValue[], const newValue[]);
+forward OnWorldSyncLoaded(entityCount, bool:storageAvailable);
+forward OnWorldSyncSaved(entityCount, changedCount, bool:dirtyOnly);
 forward OnWorldSyncCropReady(cropid);
 forward OnWorldSyncPatrolStart(patrolid, npcid, routeid);
 forward OnWorldSyncPatrolPoint(patrolid, npcid, pointIndex);

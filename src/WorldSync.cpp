@@ -162,6 +162,23 @@ void WorldSyncCore::log(LogLevelFilter level, const char* fmt, ...) const
 	va_end(args);
 }
 
+void WorldSyncCore::addEventHandler(WorldSyncEventHandler* handler)
+{
+	if (!handler)
+	{
+		return;
+	}
+	if (std::find(eventHandlers_.begin(), eventHandlers_.end(), handler) == eventHandlers_.end())
+	{
+		eventHandlers_.push_back(handler);
+	}
+}
+
+void WorldSyncCore::removeEventHandler(WorldSyncEventHandler* handler)
+{
+	eventHandlers_.erase(std::remove(eventHandlers_.begin(), eventHandlers_.end(), handler), eventHandlers_.end());
+}
+
 void WorldSyncCore::setDatabaseComponent(IDatabasesComponent* databases)
 {
 	if (database_ && databases_)
@@ -188,6 +205,7 @@ bool WorldSyncCore::load()
 	if (openSQLite() && loadSQLite())
 	{
 		rebuildSpatialGrid();
+		fireWorldLoaded(true);
 		log(LogLevelFilter::Info, "WorldSync: cargadas %d entidades desde SQLite.", lastLoadCount_);
 		return true;
 	}
@@ -197,6 +215,7 @@ bool WorldSyncCore::load()
 	{
 		lastLoadCount_ = 0;
 		log(LogLevelFilter::Warning, "WorldSync: no hay almacenamiento previo para cargar.");
+		fireWorldLoaded(false);
 		return false;
 	}
 
@@ -227,6 +246,7 @@ bool WorldSyncCore::load()
 	rebuildSpatialGrid();
 	++loadCount_;
 	lastLoadCount_ = static_cast<int>(entities_.size());
+	fireWorldLoaded(true);
 	log(LogLevelFilter::Info, "WorldSync: cargadas %d entidades desde archivo plano.", lastLoadCount_);
 	return true;
 }
@@ -241,6 +261,7 @@ int WorldSyncCore::createEntity(std::string type, Vec3 position, int world, int 
 	entity.interior = interior;
 	entities_.push_back(std::move(entity));
 	addToSpatialGrid(entities_.back());
+	fireEntityCreated(entities_.back());
 	log(LogLevelFilter::Debug, "WorldSync: entidad creada id=%d type=%s.", entities_.back().id, entities_.back().type.c_str());
 	return entities_.back().id;
 }
@@ -252,6 +273,7 @@ bool WorldSyncCore::destroyEntity(int id)
 	{
 		return false;
 	}
+	const std::string type = existing->type;
 	removeFromSpatialGrid(*existing);
 	const auto it = std::remove_if(entities_.begin(), entities_.end(), [id](const Entity& entity) {
 		return entity.id == id;
@@ -259,6 +281,7 @@ bool WorldSyncCore::destroyEntity(int id)
 	entities_.erase(it, entities_.end());
 	++deletedSinceSave_;
 	deletedEntityIDs_.push_back(id);
+	fireEntityDestroyed(id, type);
 	log(LogLevelFilter::Debug, "WorldSync: entidad destruida id=%d.", id);
 	return true;
 }
@@ -275,8 +298,12 @@ bool WorldSyncCore::setState(int id, std::string key, std::string value)
 	{
 		return false;
 	}
-	entity->state[std::move(key)] = std::move(value);
+	const std::string eventKey = key;
+	const auto existing = entity->state.find(eventKey);
+	const std::string oldValue = existing == entity->state.end() ? std::string() : existing->second;
+	entity->state[std::move(key)] = value;
 	entity->dirty = true;
+	fireEntityStateChanged(*entity, eventKey, oldValue, value);
 	log(LogLevelFilter::Debug, "WorldSync: state actualizado entity=%d.", id);
 	return true;
 }
@@ -599,6 +626,46 @@ void WorldSyncCore::rebuildSpatialGrid()
 	}
 }
 
+void WorldSyncCore::fireEntityCreated(const Entity& entity)
+{
+	for (WorldSyncEventHandler* handler : eventHandlers_)
+	{
+		handler->onEntityCreated(entity);
+	}
+}
+
+void WorldSyncCore::fireEntityDestroyed(int entityID, const std::string& type)
+{
+	for (WorldSyncEventHandler* handler : eventHandlers_)
+	{
+		handler->onEntityDestroyed(entityID, type);
+	}
+}
+
+void WorldSyncCore::fireEntityStateChanged(const Entity& entity, const std::string& key, const std::string& oldValue, const std::string& newValue)
+{
+	for (WorldSyncEventHandler* handler : eventHandlers_)
+	{
+		handler->onEntityStateChanged(entity, key, oldValue, newValue);
+	}
+}
+
+void WorldSyncCore::fireWorldLoaded(bool storageAvailable)
+{
+	for (WorldSyncEventHandler* handler : eventHandlers_)
+	{
+		handler->onWorldLoaded(lastLoadCount_, storageAvailable);
+	}
+}
+
+void WorldSyncCore::fireWorldSaved(int changedCount, bool dirtyOnly)
+{
+	for (WorldSyncEventHandler* handler : eventHandlers_)
+	{
+		handler->onWorldSaved(static_cast<int>(entities_.size()), changedCount, dirtyOnly);
+	}
+}
+
 void WorldSyncCore::simulateEntity(Entity& entity, std::chrono::milliseconds elapsed)
 {
 	entity.simulationElapsed += elapsed;
@@ -646,6 +713,7 @@ int WorldSyncCore::writeSnapshot(bool dirtyOnly)
 	++saveCount_;
 	lastSaveCount_ = static_cast<int>(entities_.size());
 	lastSaveChanged_ = changed;
+	fireWorldSaved(changed, dirtyOnly);
 	return changed;
 }
 
@@ -959,6 +1027,7 @@ int WorldSyncCore::writeSQLite(bool dirtyOnly)
 	++saveCount_;
 	lastSaveCount_ = static_cast<int>(entities_.size());
 	lastSaveChanged_ = changed;
+	fireWorldSaved(changed, dirtyOnly);
 	return changed;
 }
 
