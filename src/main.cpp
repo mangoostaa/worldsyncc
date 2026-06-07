@@ -8,6 +8,7 @@
 #include <Server/Components/Objects/objects.hpp>
 #include <Server/Components/NPCs/npcs.hpp>
 #include <Server/Components/Databases/databases.hpp>
+#include <Server/Components/TextLabels/textlabels.hpp>
 
 #include <memory>
 
@@ -359,11 +360,12 @@ public:
 		objects_ = components->queryComponent<IObjectsComponent>();
 		npcs_ = components->queryComponent<INPCComponent>();
 		databases_ = components->queryComponent<IDatabasesComponent>();
+		textLabels_ = components->queryComponent<ITextLabelsComponent>();
 		world_.setDatabaseComponent(databases_);
 		gPawn = pawn_;
 		doorModule_ = std::make_unique<worlds::DoorModule>(world_, pawn_, objects_, core_);
 		cropModule_ = std::make_unique<worlds::CropModule>(world_, pawn_, core_);
-		pathModule_ = std::make_unique<worlds::PathModule>(world_, pawn_, npcs_, core_);
+		pathModule_ = std::make_unique<worlds::PathModule>(world_, pawn_, npcs_, textLabels_, core_);
 		if (pawn_)
 		{
 			pawn_->getEventDispatcher().addEventHandler(this);
@@ -383,6 +385,10 @@ public:
 		if (!databases_ && core_)
 		{
 			core_->logLn(LogLevel::Warning, "WorldSync: no se encontro el componente Databases; usando archivo plano como fallback.");
+		}
+		if (!textLabels_ && core_)
+		{
+			core_->logLn(LogLevel::Warning, "WorldSync: no se encontro el componente TextLabels; debug visual de pathfinding desactivado.");
 		}
 	}
 
@@ -461,6 +467,7 @@ private:
 	IObjectsComponent* objects_ = nullptr;
 	INPCComponent* npcs_ = nullptr;
 	IDatabasesComponent* databases_ = nullptr;
+	ITextLabelsComponent* textLabels_ = nullptr;
 	worlds::WorldSyncCore world_;
 	std::unique_ptr<worlds::DoorModule> doorModule_;
 	std::unique_ptr<worlds::CropModule> cropModule_;

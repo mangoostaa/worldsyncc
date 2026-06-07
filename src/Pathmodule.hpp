@@ -4,6 +4,7 @@
 
 #include <Server/Components/NPCs/npcs.hpp>
 #include <Server/Components/Pawn/pawn.hpp>
+#include <Server/Components/TextLabels/textlabels.hpp>
 #include <sdk.hpp>
 #include <unordered_map>
 #include <vector>
@@ -40,10 +41,11 @@ struct Patrol
 class PathModule : public NPCEventHandler
 {
 public:
-	PathModule(WorldSyncCore& core, IPawnComponent* pawn, INPCComponent* npcs, ICore* omp)
+	PathModule(WorldSyncCore& core, IPawnComponent* pawn, INPCComponent* npcs, ITextLabelsComponent* textLabels, ICore* omp)
 		: core_(core)
 		, pawn_(pawn)
 		, npcs_(npcs)
+		, textLabels_(textLabels)
 		, omp_(omp)
 	{
 		if (npcs_)
@@ -80,6 +82,10 @@ public:
 	int getPatrolRoute(int patrolID) const;
 	int getPatrolNPC(int patrolID) const;
 
+	bool setPathDebug(bool enabled);
+	bool showRouteDebug(int routeID);
+	void clearPathDebug();
+
 	void onNPCFinishMovePathPoint(INPC& npc, int pathId, int pointId) override;
 	void onNPCFinishMovePath(INPC& npc, int pathId) override;
 
@@ -99,15 +105,20 @@ private:
 	bool removeEdge(int fromNode, int toNode);
 	float distance(int a, int b) const;
 	float distance(Vec3 a, Vec3 b) const;
+	Vec3 midpoint(Vec3 a, Vec3 b) const;
 	Vector3 toVector3(Vec3 value) const;
+	bool createDebugLabel(const std::string& text, Vec3 position, Colour colour, int world);
 
 	WorldSyncCore& core_;
 	IPawnComponent* pawn_;
 	INPCComponent* npcs_;
+	ITextLabelsComponent* textLabels_;
 	ICore* omp_;
 	int nextRouteID_ = 1;
 	int nextPatrolID_ = 1;
 	std::unordered_map<int, Route> routes_;
 	std::unordered_map<int, Patrol> patrols_;
+	std::vector<int> debugLabelIDs_;
+	bool pathDebugEnabled_ = false;
 };
 } // namespace worlds

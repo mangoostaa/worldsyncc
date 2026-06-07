@@ -5,6 +5,7 @@
 #include <limits>
 #include <queue>
 #include <sstream>
+#include <string>
 #include <unordered_set>
 
 namespace worlds
@@ -75,6 +76,7 @@ struct OpenNode
 
 PathModule::~PathModule()
 {
+	clearPathDebug();
 	if (npcs_)
 	{
 		npcs_->getEventDispatcher().removeEventHandler(this);
@@ -430,6 +432,124 @@ int PathModule::getPatrolNPC(int patrolID) const
 	return patrol ? patrol->npcID : 0;
 }
 
+bool PathModule::setPathDebug(bool enabled)
+{
+	pathDebugEnabled_ = enabled;
+	clearPathDebug();
+	if (!enabled)
+	{
+		return true;
+	}
+	if (!textLabels_)
+	{
+		return false;
+	}
+
+	int created = 0;
+	for (const Entity& entity : core_.entities())
+	{
+		if (entity.type != PATH_NODE_TYPE)
+		{
+			continue;
+		}
+
+		std::ostringstream label;
+		label << "WS node " << entity.id;
+		if (createDebugLabel(label.str(), Vec3 { entity.position.x, entity.position.y, entity.position.z + 0.65f }, Colour::Yellow(), entity.world))
+		{
+			++created;
+		}
+
+		for (const PathEdge& edge : getEdges(entity.id))
+		{
+			Vec3 target;
+			if (!core_.getPosition(edge.node, target))
+			{
+				continue;
+			}
+
+			std::ostringstream edgeLabel;
+			edgeLabel << entity.id << " -> " << edge.node << " (" << edge.cost << ")";
+			if (createDebugLabel(edgeLabel.str(), midpoint(entity.position, target), Colour::Cyan(), entity.world))
+			{
+				++created;
+			}
+		}
+	}
+
+	if (omp_)
+	{
+		omp_->printLn("[WorldSync/Path] Debug visual: %d labels creados.", created);
+	}
+	return created > 0;
+}
+
+bool PathModule::showRouteDebug(int routeID)
+{
+	clearPathDebug();
+	if (!textLabels_)
+	{
+		return false;
+	}
+
+	const auto it = routes_.find(routeID);
+	if (it == routes_.end() || it->second.nodes.empty())
+	{
+		return false;
+	}
+
+	int created = 0;
+	for (size_t i = 0; i < it->second.nodes.size(); ++i)
+	{
+		const int nodeID = it->second.nodes[i];
+		Vec3 position;
+		if (!core_.getPosition(nodeID, position))
+		{
+			continue;
+		}
+
+		std::ostringstream label;
+		label << "route " << routeID << " [" << i << "] node " << nodeID;
+		if (createDebugLabel(label.str(), Vec3 { position.x, position.y, position.z + 0.85f }, Colour::White(), core_.getWorld(nodeID)))
+		{
+			++created;
+		}
+
+		if (i + 1 < it->second.nodes.size())
+		{
+			Vec3 next;
+			const int nextNode = it->second.nodes[i + 1];
+			if (core_.getPosition(nextNode, next))
+			{
+				std::ostringstream edgeLabel;
+				edgeLabel << "[" << i << "] -> [" << (i + 1) << "]";
+				if (createDebugLabel(edgeLabel.str(), midpoint(position, next), Colour::Cyan(), core_.getWorld(nodeID)))
+				{
+					++created;
+				}
+			}
+		}
+	}
+
+	if (omp_)
+	{
+		omp_->printLn("[WorldSync/Path] Ruta %d debug: %d labels creados.", routeID, created);
+	}
+	return created > 0;
+}
+
+void PathModule::clearPathDebug()
+{
+	if (textLabels_)
+	{
+		for (int labelID : debugLabelIDs_)
+		{
+			textLabels_->release(labelID);
+		}
+	}
+	debugLabelIDs_.clear();
+}
+
 void PathModule::onNPCFinishMovePathPoint(INPC& npc, int pathId, int pointId)
 {
 	Patrol* patrol = findPatrolByNPCPath(pathId);
@@ -564,6 +684,31 @@ float PathModule::distance(Vec3 a, Vec3 b) const
 Vector3 PathModule::toVector3(Vec3 value) const
 {
 	return Vector3(value.x, value.y, value.z);
+}
+
+Vec3 PathModule::midpoint(Vec3 a, Vec3 b) const
+{
+	return Vec3 {
+		(a.x + b.x) * 0.5f,
+		(a.y + b.y) * 0.5f,
+		(a.z + b.z) * 0.5f + 0.45f
+	};
+}
+
+bool PathModule::createDebugLabel(const std::string& text, Vec3 position, Colour colour, int world)
+{
+	if (!textLabels_)
+	{
+		return false;
+	}
+
+	ITextLabel* label = textLabels_->create(StringView(text.data(), text.size()), colour, toVector3(position), 80.0f, world, false);
+	if (!label)
+	{
+		return false;
+	}
+	debugLabelIDs_.push_back(label->getID());
+	return true;
 }
 
 void PathModule::firePawnCallback(const char* name, int a, int b, int c)
@@ -740,6 +885,25 @@ static cell AMX_NATIVE_CALL n_WS_NPCGoTo(AMX*, cell* params)
 		amx_ctof(params[9]));
 }
 
+static cell AMX_NATIVE_CALL n_WS_SetPathDebug(AMX*, cell* params)
+{
+	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	return s_pathModule->setPathDebug(params[1] != 0) ? 1 : 0;
+}
+
+static cell AMX_NATIVE_CALL n_WS_DebugPathRoute(AMX*, cell* params)
+{
+	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	return s_pathModule->showRouteDebug(static_cast<int>(params[1])) ? 1 : 0;
+}
+
+static cell AMX_NATIVE_CALL n_WS_ClearPathDebug(AMX*, cell*)
+{
+	if (!s_pathModule) return 0;
+	s_pathModule->clearPathDebug();
+	return 1;
+}
+
 static cell AMX_NATIVE_CALL n_WS_CreatePatrol(AMX*, cell* params)
 {
 	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
@@ -812,6 +976,9 @@ static const AMX_NATIVE_INFO PathNatives[] = {
 	{ "WS_CreateNPCPath", n_WS_CreateNPCPath },
 	{ "WS_MoveNPCByPath", n_WS_MoveNPCByPath },
 	{ "WS_NPCGoTo", n_WS_NPCGoTo },
+	{ "WS_SetPathDebug", n_WS_SetPathDebug },
+	{ "WS_DebugPathRoute", n_WS_DebugPathRoute },
+	{ "WS_ClearPathDebug", n_WS_ClearPathDebug },
 	{ "WS_CreatePatrol", n_WS_CreatePatrol },
 	{ "WS_StartPatrol", n_WS_StartPatrol },
 	{ "WS_StopPatrol", n_WS_StopPatrol },

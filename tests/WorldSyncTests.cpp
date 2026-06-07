@@ -127,7 +127,7 @@ void testPathModuleAStar()
 	cleanStorage();
 
 	worlds::WorldSyncCore core;
-	worlds::PathModule paths(core, nullptr, nullptr, nullptr);
+	worlds::PathModule paths(core, nullptr, nullptr, nullptr, nullptr);
 
 	const int a = paths.createNode(worlds::Vec3 { 0.0f, 0.0f, 0.0f });
 	const int b = paths.createNode(worlds::Vec3 { 10.0f, 0.0f, 0.0f });

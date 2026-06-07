@@ -121,6 +121,14 @@ For simple movement, `WS_NPCGoTo` finds the closest node to the NPC and destinat
 new route = WS_NPCGoTo(npcid, 1540.0, -1180.0, 20.0, -1, -1, 80.0, WS_NPC_MOVE_WALK);
 ```
 
+Path graphs and individual routes can be visualized with text labels when the TextLabels component is loaded:
+
+```pawn
+WS_SetPathDebug(true);      // shows all path nodes and edges
+WS_DebugPathRoute(route);   // shows only one calculated route
+WS_ClearPathDebug();
+```
+
 Patrols wrap a route into reusable NPC behavior:
 
 ```pawn
