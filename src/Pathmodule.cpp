@@ -130,29 +130,7 @@ bool PathModule::disconnectNodes(int fromNode, int toNode, bool bidirectional)
 
 int PathModule::nearestNode(Vec3 position, int virtualWorld, int interior, float maxDistance) const
 {
-	const float maxDistanceSq = maxDistance <= 0.0f ? std::numeric_limits<float>::max() : maxDistance * maxDistance;
-	int bestNode = 0;
-	float bestDistanceSq = maxDistanceSq;
-
-	for (const Entity& entity : core_.entities())
-	{
-		if (entity.type != PATH_NODE_TYPE || entity.world != virtualWorld || entity.interior != interior)
-		{
-			continue;
-		}
-
-		const float dx = entity.position.x - position.x;
-		const float dy = entity.position.y - position.y;
-		const float dz = entity.position.z - position.z;
-		const float current = dx * dx + dy * dy + dz * dz;
-		if (current <= bestDistanceSq)
-		{
-			bestDistanceSq = current;
-			bestNode = entity.id;
-		}
-	}
-
-	return bestNode;
+	return core_.findNearestEntity(position, virtualWorld, interior, maxDistance, PATH_NODE_TYPE);
 }
 
 int PathModule::findPath(int startNode, int endNode)

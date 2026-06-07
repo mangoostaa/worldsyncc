@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -96,6 +97,31 @@ void testFallbackPersistenceRoundTrip()
 	assert(empty.stats().entities == 0);
 }
 
+void testSpatialGridQueries()
+{
+	cleanStorage();
+
+	worlds::WorldSyncCore core;
+	const int door = core.createEntity("door", worlds::Vec3 { 0.0f, 0.0f, 0.0f }, 0, 0);
+	const int crop = core.createEntity("crop", worlds::Vec3 { 10.0f, 0.0f, 0.0f }, 0, 0);
+	const int farCrop = core.createEntity("crop", worlds::Vec3 { 200.0f, 0.0f, 0.0f }, 0, 0);
+	const int otherWorld = core.createEntity("crop", worlds::Vec3 { 5.0f, 0.0f, 0.0f }, 1, 0);
+
+	assert(core.findNearestEntity(worlds::Vec3 { 8.0f, 0.0f, 0.0f }, 0, 0, 50.0f) == crop);
+	assert(core.findNearestEntity(worlds::Vec3 { 8.0f, 0.0f, 0.0f }, 0, 0, 50.0f, "door") == door);
+	assert(core.findNearestEntity(worlds::Vec3 { 8.0f, 0.0f, 0.0f }, 1, 0, 50.0f, "crop") == otherWorld);
+
+	std::vector<int> nearby = core.findEntitiesInRange(worlds::Vec3 { 0.0f, 0.0f, 0.0f }, 0, 0, 15.0f);
+	assert(nearby.size() == 2);
+	assert(std::find(nearby.begin(), nearby.end(), door) != nearby.end());
+	assert(std::find(nearby.begin(), nearby.end(), crop) != nearby.end());
+	assert(std::find(nearby.begin(), nearby.end(), farCrop) == nearby.end());
+	assert(std::find(nearby.begin(), nearby.end(), otherWorld) == nearby.end());
+
+	assert(core.destroyEntity(crop));
+	assert(core.findNearestEntity(worlds::Vec3 { 8.0f, 0.0f, 0.0f }, 0, 0, 50.0f, "crop") == 0);
+}
+
 void testCropModuleGrowthAndHarvest()
 {
 	cleanStorage();
@@ -170,6 +196,7 @@ int main()
 {
 	testCoreEntityLifecycle();
 	testFallbackPersistenceRoundTrip();
+	testSpatialGridQueries();
 	testCropModuleGrowthAndHarvest();
 	testPathModuleAStar();
 

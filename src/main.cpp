@@ -10,6 +10,7 @@
 #include <Server/Components/Databases/databases.hpp>
 #include <Server/Components/TextLabels/textlabels.hpp>
 
+#include <algorithm>
 #include <memory>
 
 namespace
@@ -94,6 +95,33 @@ bool setPawnCell(AMX* amx, cell address, cell value)
 
 	*phys = value;
 	return true;
+}
+
+int fillPawnArray(AMX* amx, cell address, const std::vector<int>& values, int maxValues)
+{
+	if (!gPawn || maxValues <= 0)
+	{
+		return 0;
+	}
+
+	IPawnScript* script = gPawn->getScript(amx);
+	if (!script)
+	{
+		return 0;
+	}
+
+	cell* phys = nullptr;
+	if (script->GetAddr(address, &phys) != AMX_ERR_NONE || !phys)
+	{
+		return 0;
+	}
+
+	const int written = std::min(static_cast<int>(values.size()), maxValues);
+	for (int i = 0; i < written; ++i)
+	{
+		phys[i] = static_cast<cell>(values[static_cast<size_t>(i)]);
+	}
+	return written;
 }
 
 cell AMX_NATIVE_CALL WS_Load(AMX*, cell*)
@@ -206,6 +234,47 @@ cell AMX_NATIVE_CALL WS_GetEntityIDAt(AMX*, cell* params)
 		return 0;
 	}
 	return gWorld->getEntityIDAt(static_cast<size_t>(params[1]));
+}
+
+cell AMX_NATIVE_CALL WS_GetNearestEntity(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 7))
+	{
+		return 0;
+	}
+
+	const worlds::Vec3 position { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
+	const std::string type = pawnString(amx, params[7]);
+	return gWorld->findNearestEntity(
+		position,
+		static_cast<int>(params[4]),
+		static_cast<int>(params[5]),
+		amx_ctof(params[6]),
+		type);
+}
+
+cell AMX_NATIVE_CALL WS_GetEntitiesInRange(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 9))
+	{
+		return 0;
+	}
+
+	const int maxEntities = static_cast<int>(params[5]);
+	if (maxEntities <= 0)
+	{
+		return 0;
+	}
+
+	const worlds::Vec3 position { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
+	const std::vector<int> entities = gWorld->findEntitiesInRange(
+		position,
+		static_cast<int>(params[6]),
+		static_cast<int>(params[7]),
+		amx_ctof(params[8]),
+		pawnString(amx, params[9]));
+
+	return fillPawnArray(amx, params[4], entities, maxEntities);
 }
 
 cell AMX_NATIVE_CALL WS_SetSimulated(AMX*, cell* params)
@@ -323,6 +392,8 @@ const AMX_NATIVE_INFO WorldSyncNatives[] = {
 	{ "WS_GetEntityInterior", WS_GetEntityInterior },
 	{ "WS_GetEntityCount", WS_GetEntityCount },
 	{ "WS_GetEntityIDAt", WS_GetEntityIDAt },
+	{ "WS_GetNearestEntity", WS_GetNearestEntity },
+	{ "WS_GetEntitiesInRange", WS_GetEntitiesInRange },
 	{ "WS_SetSimulated", WS_SetSimulated },
 	{ "WS_Save", WS_Save },
 	{ "WS_GetStats", WS_GetStats },

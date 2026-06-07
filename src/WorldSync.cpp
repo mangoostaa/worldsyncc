@@ -5,8 +5,10 @@
 
 #include <algorithm>
 #include <cstdarg>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 
 namespace worlds
@@ -16,6 +18,7 @@ namespace
 constexpr std::chrono::milliseconds AutosaveInterval { 30000 };
 constexpr const char* StoragePath = "scriptfiles/WorldSync.entities";
 constexpr const char* SQLitePath = "scriptfiles/WorldSync.db";
+constexpr float SpatialCellSize = 50.0f;
 
 std::string escapeField(const std::string& value)
 {
@@ -184,6 +187,7 @@ bool WorldSyncCore::load()
 {
 	if (openSQLite() && loadSQLite())
 	{
+		rebuildSpatialGrid();
 		log(LogLevelFilter::Info, "WorldSync: cargadas %d entidades desde SQLite.", lastLoadCount_);
 		return true;
 	}
@@ -220,6 +224,7 @@ bool WorldSyncCore::load()
 		entities_.push_back(std::move(entity));
 	}
 
+	rebuildSpatialGrid();
 	++loadCount_;
 	lastLoadCount_ = static_cast<int>(entities_.size());
 	log(LogLevelFilter::Info, "WorldSync: cargadas %d entidades desde archivo plano.", lastLoadCount_);
@@ -235,19 +240,22 @@ int WorldSyncCore::createEntity(std::string type, Vec3 position, int world, int 
 	entity.world = world;
 	entity.interior = interior;
 	entities_.push_back(std::move(entity));
+	addToSpatialGrid(entities_.back());
 	log(LogLevelFilter::Debug, "WorldSync: entidad creada id=%d type=%s.", entities_.back().id, entities_.back().type.c_str());
 	return entities_.back().id;
 }
 
 bool WorldSyncCore::destroyEntity(int id)
 {
-	const auto it = std::remove_if(entities_.begin(), entities_.end(), [id](const Entity& entity) {
-		return entity.id == id;
-	});
-	if (it == entities_.end())
+	const Entity* existing = findEntity(id);
+	if (!existing)
 	{
 		return false;
 	}
+	removeFromSpatialGrid(*existing);
+	const auto it = std::remove_if(entities_.begin(), entities_.end(), [id](const Entity& entity) {
+		return entity.id == id;
+	});
 	entities_.erase(it, entities_.end());
 	++deletedSinceSave_;
 	deletedEntityIDs_.push_back(id);
@@ -332,6 +340,94 @@ int WorldSyncCore::getEntityIDAt(size_t index) const
 	return entities_[index].id;
 }
 
+std::vector<int> WorldSyncCore::findEntitiesInRange(Vec3 position, int world, int interior, float radius, const std::string& type) const
+{
+	std::vector<int> result;
+	if (radius < 0.0f)
+	{
+		return result;
+	}
+
+	const float radiusSq = radius * radius;
+	const int cellRadius = static_cast<int>(std::ceil(radius / SpatialCellSize));
+	const SpatialCell center = spatialCellFor(position, world, interior);
+
+	for (int cy = center.y - cellRadius; cy <= center.y + cellRadius; ++cy)
+	{
+		for (int cx = center.x - cellRadius; cx <= center.x + cellRadius; ++cx)
+		{
+			const auto it = spatialGrid_.find(SpatialCell { world, interior, cx, cy });
+			if (it == spatialGrid_.end())
+			{
+				continue;
+			}
+
+			for (int entityID : it->second)
+			{
+				const Entity* entity = findEntity(entityID);
+				if (!entity || (!type.empty() && entity->type != type))
+				{
+					continue;
+				}
+
+				const float dx = entity->position.x - position.x;
+				const float dy = entity->position.y - position.y;
+				const float dz = entity->position.z - position.z;
+				if ((dx * dx + dy * dy + dz * dz) <= radiusSq)
+				{
+					result.push_back(entityID);
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+int WorldSyncCore::findNearestEntity(Vec3 position, int world, int interior, float maxDistance, const std::string& type) const
+{
+	int bestEntity = 0;
+	float bestDistanceSq = maxDistance <= 0.0f ? std::numeric_limits<float>::max() : maxDistance * maxDistance;
+
+	auto testEntity = [&](const Entity& entity) {
+		if (entity.world != world || entity.interior != interior || (!type.empty() && entity.type != type))
+		{
+			return;
+		}
+
+		const float dx = entity.position.x - position.x;
+		const float dy = entity.position.y - position.y;
+		const float dz = entity.position.z - position.z;
+		const float current = dx * dx + dy * dy + dz * dz;
+		if (current <= bestDistanceSq)
+		{
+			bestDistanceSq = current;
+			bestEntity = entity.id;
+		}
+	};
+
+	if (maxDistance <= 0.0f)
+	{
+		for (const Entity& entity : entities_)
+		{
+			testEntity(entity);
+		}
+		return bestEntity;
+	}
+
+	const std::vector<int> candidates = findEntitiesInRange(position, world, interior, maxDistance, type);
+	for (int entityID : candidates)
+	{
+		const Entity* entity = findEntity(entityID);
+		if (entity)
+		{
+			testEntity(*entity);
+		}
+	}
+
+	return bestEntity;
+}
+
 bool WorldSyncCore::setSimulated(int id, bool enabled)
 {
 	Entity* entity = findEntity(id);
@@ -391,6 +487,7 @@ int WorldSyncCore::saveAll()
 void WorldSyncCore::reset()
 {
 	entities_.clear();
+	spatialGrid_.clear();
 	nextID_ = 1;
 	deletedSinceSave_ = 0;
 	deletedEntityIDs_.clear();
@@ -445,6 +542,61 @@ const Entity* WorldSyncCore::findEntity(int id) const
 		}
 	}
 	return nullptr;
+}
+
+size_t WorldSyncCore::SpatialCellHash::operator()(const SpatialCell& cell) const
+{
+	size_t seed = static_cast<size_t>(cell.world);
+	seed ^= static_cast<size_t>(cell.interior) + 0x9e3779b9u + (seed << 6) + (seed >> 2);
+	seed ^= static_cast<size_t>(cell.x) + 0x9e3779b9u + (seed << 6) + (seed >> 2);
+	seed ^= static_cast<size_t>(cell.y) + 0x9e3779b9u + (seed << 6) + (seed >> 2);
+	return seed;
+}
+
+WorldSyncCore::SpatialCell WorldSyncCore::spatialCellFor(const Entity& entity) const
+{
+	return spatialCellFor(entity.position, entity.world, entity.interior);
+}
+
+WorldSyncCore::SpatialCell WorldSyncCore::spatialCellFor(Vec3 position, int world, int interior) const
+{
+	return SpatialCell {
+		world,
+		interior,
+		static_cast<int>(std::floor(position.x / SpatialCellSize)),
+		static_cast<int>(std::floor(position.y / SpatialCellSize))
+	};
+}
+
+void WorldSyncCore::addToSpatialGrid(const Entity& entity)
+{
+	spatialGrid_[spatialCellFor(entity)].push_back(entity.id);
+}
+
+void WorldSyncCore::removeFromSpatialGrid(const Entity& entity)
+{
+	const SpatialCell cell = spatialCellFor(entity);
+	const auto it = spatialGrid_.find(cell);
+	if (it == spatialGrid_.end())
+	{
+		return;
+	}
+
+	std::vector<int>& ids = it->second;
+	ids.erase(std::remove(ids.begin(), ids.end(), entity.id), ids.end());
+	if (ids.empty())
+	{
+		spatialGrid_.erase(it);
+	}
+}
+
+void WorldSyncCore::rebuildSpatialGrid()
+{
+	spatialGrid_.clear();
+	for (const Entity& entity : entities_)
+	{
+		addToSpatialGrid(entity);
+	}
 }
 
 void WorldSyncCore::simulateEntity(Entity& entity, std::chrono::milliseconds elapsed)
@@ -682,6 +834,8 @@ bool WorldSyncCore::loadSQLite()
 	if (!result)
 	{
 		++loadCount_;
+		lastLoadCount_ = static_cast<int>(entities_.size());
+		rebuildSpatialGrid();
 		return true;
 	}
 
@@ -701,6 +855,7 @@ bool WorldSyncCore::loadSQLite()
 
 	++loadCount_;
 	lastLoadCount_ = static_cast<int>(entities_.size());
+	rebuildSpatialGrid();
 	return true;
 }
 

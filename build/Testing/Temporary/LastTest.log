@@ -1,10 +1,10 @@
-Start testing: Jun 07 06:27 Hora estándar de Argentina
+Start testing: Jun 07 18:00 Hora estándar de Argentina
 ----------------------------------------------------------
 1/1 Testing: WorldSyncTests
 1/1 Test: WorldSyncTests
 Command: "C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build/Release/WorldSyncTests.exe"
 Directory: C:/Users/Noxi-PC/open.mp-sdk/WorldSync/build
-"WorldSyncTests" start time: Jun 07 06:27 Hora estándar de Argentina
+"WorldSyncTests" start time: Jun 07 18:00 Hora estándar de Argentina
 Output:
 ----------------------------------------------------------
 WorldSync unit tests passed
@@ -12,8 +12,8 @@ WorldSync unit tests passed
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"WorldSyncTests" end time: Jun 07 06:27 Hora estándar de Argentina
+"WorldSyncTests" end time: Jun 07 18:00 Hora estándar de Argentina
 "WorldSyncTests" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Jun 07 06:27 Hora estándar de Argentina
+End testing: Jun 07 18:00 Hora estándar de Argentina

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 struct IDatabasesComponent;
@@ -77,6 +78,8 @@ public:
 	int getWorld(int id) const;
 	int getInterior(int id) const;
 	int getEntityIDAt(size_t index) const;
+	std::vector<int> findEntitiesInRange(Vec3 position, int world, int interior, float radius, const std::string& type = {}) const;
+	int findNearestEntity(Vec3 position, int world, int interior, float maxDistance, const std::string& type = {}) const;
 
 	bool setSimulated(int id, bool enabled);
 	void tick(std::chrono::milliseconds elapsed);
@@ -89,8 +92,31 @@ public:
 	const std::vector<Entity>& entities() const { return entities_; }
 
 private:
+	struct SpatialCell
+	{
+		int world = 0;
+		int interior = 0;
+		int x = 0;
+		int y = 0;
+
+		bool operator==(const SpatialCell& other) const
+		{
+			return world == other.world && interior == other.interior && x == other.x && y == other.y;
+		}
+	};
+
+	struct SpatialCellHash
+	{
+		size_t operator()(const SpatialCell& cell) const;
+	};
+
 	Entity* findEntity(int id);
 	const Entity* findEntity(int id) const;
+	SpatialCell spatialCellFor(const Entity& entity) const;
+	SpatialCell spatialCellFor(Vec3 position, int world, int interior) const;
+	void addToSpatialGrid(const Entity& entity);
+	void removeFromSpatialGrid(const Entity& entity);
+	void rebuildSpatialGrid();
 	void simulateEntity(Entity& entity, std::chrono::milliseconds elapsed);
 	int writeSnapshot(bool dirtyOnly);
 	bool parseSnapshotLine(const std::string& line, Entity& entity) const;
@@ -103,6 +129,7 @@ private:
 	bool execSQL(const std::string& query);
 
 	std::vector<Entity> entities_;
+	std::unordered_map<SpatialCell, std::vector<int>, SpatialCellHash> spatialGrid_;
 	IDatabasesComponent* databases_ = nullptr;
 	IDatabaseConnection* database_ = nullptr;
 	ILogger* logger_ = nullptr;

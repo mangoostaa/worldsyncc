@@ -37,6 +37,8 @@ native WS_GetEntityWorld(entityid);
 native WS_GetEntityInterior(entityid);
 native WS_GetEntityCount();
 native WS_GetEntityIDAt(index);
+native WS_GetNearestEntity(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0, const type[] = "");
+native WS_GetEntitiesInRange(Float:x, Float:y, Float:z, entityids[], maxEntities = sizeof(entityids), virtualworld = 0, interior = 0, Float:radius = 50.0, const type[] = "");
 native WS_SetSimulated(entityid, bool:enabled);
 native WS_Save(bool:dirtyOnly = true);
 native WS_GetStats(stat);
