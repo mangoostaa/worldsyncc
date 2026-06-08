@@ -56,6 +56,7 @@ public OnGameModeInit()
 - [15 minute houses, doors and guards guide](docs/quickstart-houses-doors-guards.md)
 - [Example gamemode / filterscript](docs/examples.md)
 - [Release and precompiled build guide](docs/releases.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Example
 
@@ -108,3 +109,7 @@ scriptfiles/WorldSync.entities
 ## Status
 
 This repository is ready for early adoption testing. The public Pawn API is usable, but future releases may add schema migrations and more typed modules for vehicles, businesses, production chains and richer NPC routines.
+
+## License
+
+WorldSync is released under the [MIT License](LICENSE).
