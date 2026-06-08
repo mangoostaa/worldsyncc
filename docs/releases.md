@@ -42,6 +42,20 @@ Artifact:
 build/Release/WorldSync.dll
 ```
 
+## Windows Package
+
+After the Windows build and tests pass, create the release archive:
+
+```powershell
+.\scripts\package-windows.ps1 -Version v0.1.0
+```
+
+The generated archive is:
+
+```text
+dist/WorldSync-v0.1.0-windows-x64.zip
+```
+
 ## Linux Build
 
 ```bash
@@ -70,6 +84,7 @@ build/libWorldSync.so
 - Verify path debug labels if TextLabels is loaded.
 - Verify NPC patrol if NPCs is loaded.
 - Package `.dll`, `.so`, `worldsync.inc`, docs and examples.
+- Include `CHANGELOG.md` in release notes.
 - Create Git tag, for example `v0.1.0`.
 - Publish archives in GitHub Releases.
 
