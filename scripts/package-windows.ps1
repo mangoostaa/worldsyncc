@@ -36,6 +36,7 @@ Copy-Item (Join-Path $repoRoot "README.md") (Join-Path $packageRoot "README.md")
 Copy-Item (Join-Path $repoRoot "CHANGELOG.md") (Join-Path $packageRoot "CHANGELOG.md") -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $repoRoot "LICENSE") (Join-Path $packageRoot "LICENSE") -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $repoRoot "CONTRIBUTING.md") (Join-Path $packageRoot "CONTRIBUTING.md") -ErrorAction SilentlyContinue
+Copy-Item (Join-Path $repoRoot "ROADMAP.md") (Join-Path $packageRoot "ROADMAP.md") -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $repoRoot "docs\*") (Join-Path $packageRoot "docs") -Recurse
 Copy-Item (Join-Path $repoRoot "examples\*") (Join-Path $packageRoot "examples") -Recurse
 

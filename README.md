@@ -57,6 +57,7 @@ public OnGameModeInit()
 - [Example gamemode / filterscript](docs/examples.md)
 - [Release and precompiled build guide](docs/releases.md)
 - [Contributing](CONTRIBUTING.md)
+- [Roadmap](ROADMAP.md)
 
 ## Example
 
