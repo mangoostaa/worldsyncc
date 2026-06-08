@@ -56,7 +56,7 @@ std::string pawnString(AMX* amx, cell address)
 
 bool setPawnString(AMX* amx, cell address, const std::string& value, size_t maxLength)
 {
-	if (!gPawn)
+	if (!gPawn || maxLength == 0)
 	{
 		return false;
 	}
@@ -161,7 +161,12 @@ cell AMX_NATIVE_CALL WS_CreateEntity(AMX* amx, cell* params)
 	}
 
 	worlds::Vec3 position { amx_ctof(params[2]), amx_ctof(params[3]), amx_ctof(params[4]) };
-	return gWorld->createEntity(pawnString(amx, params[1]), position, static_cast<int>(params[5]), static_cast<int>(params[6]));
+	const std::string type = pawnString(amx, params[1]);
+	if (type.empty())
+	{
+		return 0;
+	}
+	return gWorld->createEntity(type, position, static_cast<int>(params[5]), static_cast<int>(params[6]));
 }
 
 cell AMX_NATIVE_CALL WS_DestroyEntity(AMX*, cell* params)
@@ -181,7 +186,13 @@ cell AMX_NATIVE_CALL WS_SetState(AMX* amx, cell* params)
 		return 0;
 	}
 
-	return gWorld->setState(static_cast<int>(params[1]), pawnString(amx, params[2]), pawnString(amx, params[3])) ? 1 : 0;
+	const std::string key = pawnString(amx, params[2]);
+	if (key.empty())
+	{
+		return 0;
+	}
+
+	return gWorld->setState(static_cast<int>(params[1]), key, pawnString(amx, params[3])) ? 1 : 0;
 }
 
 cell AMX_NATIVE_CALL WS_GetState(AMX* amx, cell* params)
@@ -192,7 +203,8 @@ cell AMX_NATIVE_CALL WS_GetState(AMX* amx, cell* params)
 	}
 
 	std::string value;
-	if (!gWorld->getState(static_cast<int>(params[1]), pawnString(amx, params[2]), value))
+	const std::string key = pawnString(amx, params[2]);
+	if (key.empty() || params[4] <= 0 || !gWorld->getState(static_cast<int>(params[1]), key, value))
 	{
 		return 0;
 	}
@@ -208,7 +220,7 @@ cell AMX_NATIVE_CALL WS_GetEntityType(AMX* amx, cell* params)
 	}
 
 	std::string type;
-	if (!gWorld->getType(static_cast<int>(params[1]), type))
+	if (params[3] <= 0 || !gWorld->getType(static_cast<int>(params[1]), type))
 	{
 		return 0;
 	}

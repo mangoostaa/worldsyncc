@@ -74,6 +74,8 @@ int CropModule::createCrop(const std::string& species,
     int   virtualWorld,
     int   interior)
 {
+    if (species.empty()) return 0;
+
     const int id = core_.createEntity(CROP_TYPE, position, virtualWorld, interior);
 
     setStr  (id, CROP_KEY_SPECIES,     species);
@@ -255,7 +257,7 @@ static CropModule* s_cropModule = nullptr;
 static bool amxSetStr(AMX* amx, IPawnComponent* pawn,
     cell address, const std::string& value, size_t maxLen)
 {
-    if (!pawn) return false;
+    if (!pawn || maxLen == 0) return false;
     IPawnScript* script = pawn->getScript(amx);
     if (!script) return false;
     cell* phys = nullptr;
@@ -286,9 +288,10 @@ static std::string amxGetStr(AMX* amx, IPawnComponent* pawn, cell address)
 //                Float:growthRate=1.0, maxHarvests=0, vw=0, interior=0)
 static cell AMX_NATIVE_CALL n_WS_CreateCrop(AMX* amx, cell* params)
 {
-    if (!s_cropModule || params[0] / (cell)sizeof(cell) < 8) return 0;
+    if (!s_cropModule || !params || params[0] / (cell)sizeof(cell) < 8) return 0;
 
     const std::string species = amxGetStr(amx, s_cropModule->pawnRef(), params[1]);
+    if (species.empty()) return 0;
     const Vec3 pos = { amx_ctof(params[2]), amx_ctof(params[3]), amx_ctof(params[4]) };
     const float rate       = amx_ctof(params[5]);
     const int   maxHarv    = static_cast<int>(params[6]);
@@ -301,21 +304,21 @@ static cell AMX_NATIVE_CALL n_WS_CreateCrop(AMX* amx, cell* params)
 //  WS_DestroyCrop(cropID)
 static cell AMX_NATIVE_CALL n_WS_DestroyCrop(AMX*, cell* params)
 {
-    if (!s_cropModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_cropModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return s_cropModule->destroyCrop(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 //  WS_GetCropGrowth(cropID)  → 0-100
 static cell AMX_NATIVE_CALL n_WS_GetCropGrowth(AMX*, cell* params)
 {
-    if (!s_cropModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_cropModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return static_cast<cell>(s_cropModule->getGrowth(static_cast<int>(params[1])));
 }
 
 //  WS_SetCropGrowth(cropID, value)
 static cell AMX_NATIVE_CALL n_WS_SetCropGrowth(AMX*, cell* params)
 {
-    if (!s_cropModule || params[0] / (cell)sizeof(cell) < 2) return 0;
+    if (!s_cropModule || !params || params[0] / (cell)sizeof(cell) < 2) return 0;
     return s_cropModule->setGrowth(
         static_cast<int>(params[1]),
         static_cast<int>(params[2])) ? 1 : 0;
@@ -324,28 +327,28 @@ static cell AMX_NATIVE_CALL n_WS_SetCropGrowth(AMX*, cell* params)
 //  WS_IsCropReady(cropID)
 static cell AMX_NATIVE_CALL n_WS_IsCropReady(AMX*, cell* params)
 {
-    if (!s_cropModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_cropModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return s_cropModule->isReady(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 //  WS_HarvestCrop(cropID)
 static cell AMX_NATIVE_CALL n_WS_HarvestCrop(AMX*, cell* params)
 {
-    if (!s_cropModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_cropModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return s_cropModule->harvest(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 //  WS_GetCropHarvests(cropID)
 static cell AMX_NATIVE_CALL n_WS_GetCropHarvests(AMX*, cell* params)
 {
-    if (!s_cropModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_cropModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return static_cast<cell>(s_cropModule->getHarvests(static_cast<int>(params[1])));
 }
 
 //  WS_GetCropSpecies(cropID, output[], maxlen)
 static cell AMX_NATIVE_CALL n_WS_GetCropSpecies(AMX* amx, cell* params)
 {
-    if (!s_cropModule || params[0] / (cell)sizeof(cell) < 3) return 0;
+    if (!s_cropModule || !params || params[0] / (cell)sizeof(cell) < 3 || params[3] <= 0) return 0;
     std::string species;
     if (!s_cropModule->getSpecies(static_cast<int>(params[1]), species)) return 0;
     return amxSetStr(amx, s_cropModule->pawnRef(), params[2], species,

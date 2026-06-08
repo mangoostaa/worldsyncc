@@ -253,6 +253,11 @@ bool WorldSyncCore::load()
 
 int WorldSyncCore::createEntity(std::string type, Vec3 position, int world, int interior)
 {
+	if (type.empty())
+	{
+		return 0;
+	}
+
 	Entity entity;
 	entity.id = nextID_++;
 	entity.type = std::move(type);
@@ -293,6 +298,11 @@ bool WorldSyncCore::hasEntity(int id) const
 
 bool WorldSyncCore::setState(int id, std::string key, std::string value)
 {
+	if (key.empty())
+	{
+		return false;
+	}
+
 	Entity* entity = findEntity(id);
 	if (!entity)
 	{
@@ -310,6 +320,11 @@ bool WorldSyncCore::setState(int id, std::string key, std::string value)
 
 bool WorldSyncCore::getState(int id, const std::string& key, std::string& value) const
 {
+	if (key.empty())
+	{
+		return false;
+	}
+
 	const Entity* entity = findEntity(id);
 	if (!entity)
 	{
@@ -549,6 +564,11 @@ Stats WorldSyncCore::stats() const
 
 Entity* WorldSyncCore::findEntity(int id)
 {
+	if (id <= 0)
+	{
+		return nullptr;
+	}
+
 	for (Entity& entity : entities_)
 	{
 		if (entity.id == id)
@@ -561,6 +581,11 @@ Entity* WorldSyncCore::findEntity(int id)
 
 const Entity* WorldSyncCore::findEntity(int id) const
 {
+	if (id <= 0)
+	{
+		return nullptr;
+	}
+
 	for (const Entity& entity : entities_)
 	{
 		if (entity.id == id)

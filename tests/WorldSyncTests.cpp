@@ -76,12 +76,16 @@ void testCoreEntityLifecycle()
 	cleanStorage();
 
 	worlds::WorldSyncCore core;
+	assert(core.createEntity("", worlds::Vec3 {}, 0, 0) == 0);
+
 	const int id = core.createEntity("door", worlds::Vec3 { 1.0f, 2.0f, 3.0f }, 4, 5);
 	assert(id == 1);
 	assert(core.hasEntity(id));
+	std::string value;
+	assert(!core.setState(id, "", "bad"));
+	assert(!core.getState(id, "", value));
 	assert(core.setState(id, "locked", "1"));
 
-	std::string value;
 	assert(core.getState(id, "locked", value));
 	assert(value == "1");
 
@@ -213,6 +217,8 @@ void testCropModuleGrowthAndHarvest()
 
 	worlds::WorldSyncCore core;
 	worlds::CropModule crops(core, nullptr, nullptr);
+	assert(crops.createCrop("", worlds::Vec3 {}, 1.0f, 1) == 0);
+
 	const int crop = crops.createCrop("corn", worlds::Vec3 { 0.0f, 0.0f, 0.0f }, 10.0f, 2);
 
 	assert(crops.isCrop(crop));
@@ -239,6 +245,8 @@ void testVehicleModulePersistenceFallback()
 
 	worlds::WorldSyncCore core;
 	worlds::VehicleModule vehicles(core, nullptr, nullptr, nullptr);
+	assert(vehicles.createVehicle(0, worlds::Vec3 {}, 0.0f, 1, 2, -1, false) == 0);
+
 	const int vehicle = vehicles.createVehicle(411, worlds::Vec3 { 1.0f, 2.0f, 3.0f }, 90.0f, 1, 2, -1, false);
 
 	assert(vehicle == 1);

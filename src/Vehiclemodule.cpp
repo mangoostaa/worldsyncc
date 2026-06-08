@@ -60,6 +60,11 @@ bool setPawnCell(AMX* amx, IPawnComponent* pawn, cell address, cell value)
 
 int VehicleModule::createVehicle(int model, Vec3 position, float zRotation, int colour1, int colour2, int respawnDelay, bool siren, int virtualWorld, int interior)
 {
+	if (model <= 0)
+	{
+		return 0;
+	}
+
 	const int id = core_.createEntity(VEHICLE_TYPE, position, virtualWorld, interior);
 	setInt(id, VEHICLE_KEY_MODEL, model);
 	setFloat(id, VEHICLE_KEY_ZROT, zRotation);
@@ -323,7 +328,7 @@ static VehicleModule* s_vehicleModule = nullptr;
 
 static cell AMX_NATIVE_CALL n_WS_CreateVehicle(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 11) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 11) return 0;
 	const Vec3 position { amx_ctof(params[2]), amx_ctof(params[3]), amx_ctof(params[4]) };
 	return s_vehicleModule->createVehicle(
 		static_cast<int>(params[1]),
@@ -339,25 +344,25 @@ static cell AMX_NATIVE_CALL n_WS_CreateVehicle(AMX*, cell* params)
 
 static cell AMX_NATIVE_CALL n_WS_DestroyVehicle(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_vehicleModule->destroyVehicle(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetVehicleID(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_vehicleModule->getRuntimeVehicleID(static_cast<int>(params[1]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetVehicleModel(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_vehicleModule->getModel(static_cast<int>(params[1]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetVehiclePos(AMX* amx, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 4) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 4) return 0;
 	Vec3 position;
 	if (!s_vehicleModule->getPosition(static_cast<int>(params[1]), position)) return 0;
 	return setPawnCell(amx, s_vehicleModule->pawnRef(), params[2], amx_ftoc(position.x))
@@ -369,31 +374,31 @@ static cell AMX_NATIVE_CALL n_WS_GetVehiclePos(AMX* amx, cell* params)
 
 static cell AMX_NATIVE_CALL n_WS_GetVehicleZRot(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return amx_ftoc(s_vehicleModule->getZRotation(static_cast<int>(params[1])));
 }
 
 static cell AMX_NATIVE_CALL n_WS_SetVehicleHealth(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 2) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 2) return 0;
 	return s_vehicleModule->setHealth(static_cast<int>(params[1]), amx_ctof(params[2])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetVehicleHealth(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return amx_ftoc(s_vehicleModule->getHealth(static_cast<int>(params[1])));
 }
 
 static cell AMX_NATIVE_CALL n_WS_SetVehicleColours(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 3) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 3) return 0;
 	return s_vehicleModule->setColours(static_cast<int>(params[1]), static_cast<int>(params[2]), static_cast<int>(params[3])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetVehicleColours(AMX* amx, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 3) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 3) return 0;
 	int colour1 = -1;
 	int colour2 = -1;
 	if (!s_vehicleModule->getColours(static_cast<int>(params[1]), colour1, colour2)) return 0;
@@ -405,13 +410,13 @@ static cell AMX_NATIVE_CALL n_WS_GetVehicleColours(AMX* amx, cell* params)
 
 static cell AMX_NATIVE_CALL n_WS_RespawnVehicle(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_vehicleModule->respawnVehicle(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_RepairVehicle(AMX*, cell* params)
 {
-	if (!s_vehicleModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_vehicleModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_vehicleModule->repairVehicle(static_cast<int>(params[1])) ? 1 : 0;
 }
 

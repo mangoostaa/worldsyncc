@@ -89,6 +89,8 @@ int DoorModule::createDoor(int model,
     int virtualWorld,
     int interior)
 {
+    if (model <= 0) return 0;
+
     const int id = core_.createEntity(DOOR_TYPE, position, virtualWorld, interior);
 
     // Estado inicial: cerrada, desbloqueada
@@ -375,7 +377,7 @@ static bool amxSetFloat(AMX* amx, IPawnComponent* pawn, cell address, float valu
 //                vw=0, interior=0)
 static cell AMX_NATIVE_CALL n_WS_CreateDoor(AMX*, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 12) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 12) return 0;
 
     const int    model    = static_cast<int>(params[1]);
     const Vec3   pos      = { amx_ctof(params[2]), amx_ctof(params[3]), amx_ctof(params[4]) };
@@ -390,82 +392,84 @@ static cell AMX_NATIVE_CALL n_WS_CreateDoor(AMX*, cell* params)
 //  WS_DestroyDoor(doorID)
 static cell AMX_NATIVE_CALL n_WS_DestroyDoor(AMX*, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return s_doorModule->destroyDoor(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 //  WS_SetDoorOpen(doorID, bool:open)
 static cell AMX_NATIVE_CALL n_WS_SetDoorOpen(AMX*, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 2) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 2) return 0;
     return s_doorModule->setOpen(static_cast<int>(params[1]), params[2] != 0) ? 1 : 0;
 }
 
 //  WS_IsDoorOpen(doorID)
 static cell AMX_NATIVE_CALL n_WS_IsDoorOpen(AMX*, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return s_doorModule->isOpen(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 //  WS_SetDoorLocked(doorID, bool:locked)
 static cell AMX_NATIVE_CALL n_WS_SetDoorLocked(AMX*, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 2) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 2) return 0;
     return s_doorModule->setLocked(static_cast<int>(params[1]), params[2] != 0) ? 1 : 0;
 }
 
 //  WS_IsDoorLocked(doorID)
 static cell AMX_NATIVE_CALL n_WS_IsDoorLocked(AMX*, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return s_doorModule->isLocked(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 //  WS_GetDoorModel(doorID)
 static cell AMX_NATIVE_CALL n_WS_GetDoorModel(AMX*, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 1) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 1) return 0;
     return static_cast<cell>(s_doorModule->getModel(static_cast<int>(params[1])));
 }
 
 //  WS_GetDoorObject(doorID)
 static cell AMX_NATIVE_CALL n_WS_GetDoorObject(AMX*, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 1) return -1;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 1) return -1;
     return static_cast<cell>(s_doorModule->getObjectID(static_cast<int>(params[1])));
 }
 
 //  WS_GetDoorPos(doorID, &Float:x, &Float:y, &Float:z)
 static cell AMX_NATIVE_CALL n_WS_GetDoorPos(AMX* amx, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 4) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 4) return 0;
     Vec3 pos;
     if (!s_doorModule->getPosition(static_cast<int>(params[1]), pos)) return 0;
     auto* pawn = s_doorModule->pawnRef();
-    amxSetFloat(amx, pawn, params[2], pos.x);
-    amxSetFloat(amx, pawn, params[3], pos.y);
-    amxSetFloat(amx, pawn, params[4], pos.z);
-    return 1;
+    return amxSetFloat(amx, pawn, params[2], pos.x)
+        && amxSetFloat(amx, pawn, params[3], pos.y)
+        && amxSetFloat(amx, pawn, params[4], pos.z)
+        ? 1
+        : 0;
 }
 
 //  WS_GetDoorRot(doorID, &Float:rx, &Float:ry, &Float:rz,
 //                         &Float:orx, &Float:ory, &Float:orz)
 static cell AMX_NATIVE_CALL n_WS_GetDoorRot(AMX* amx, cell* params)
 {
-    if (!s_doorModule || params[0] / (cell)sizeof(cell) < 7) return 0;
+    if (!s_doorModule || !params || params[0] / (cell)sizeof(cell) < 7) return 0;
     Vec3 closeRot, openRot;
     const int id = static_cast<int>(params[1]);
     if (!s_doorModule->getCloseRot(id, closeRot)) return 0;
     if (!s_doorModule->getOpenRot(id, openRot))   return 0;
     auto* pawn = s_doorModule->pawnRef();
-    amxSetFloat(amx, pawn, params[2], closeRot.x);
-    amxSetFloat(amx, pawn, params[3], closeRot.y);
-    amxSetFloat(amx, pawn, params[4], closeRot.z);
-    amxSetFloat(amx, pawn, params[5], openRot.x);
-    amxSetFloat(amx, pawn, params[6], openRot.y);
-    amxSetFloat(amx, pawn, params[7], openRot.z);
-    return 1;
+    return amxSetFloat(amx, pawn, params[2], closeRot.x)
+        && amxSetFloat(amx, pawn, params[3], closeRot.y)
+        && amxSetFloat(amx, pawn, params[4], closeRot.z)
+        && amxSetFloat(amx, pawn, params[5], openRot.x)
+        && amxSetFloat(amx, pawn, params[6], openRot.y)
+        && amxSetFloat(amx, pawn, params[7], openRot.z)
+        ? 1
+        : 0;
 }
 
 static const AMX_NATIVE_INFO DoorNatives[] = {

@@ -814,39 +814,39 @@ static PathModule* s_pathModule = nullptr;
 
 static cell AMX_NATIVE_CALL n_WS_CreatePathNode(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
 	const Vec3 position { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
 	return s_pathModule->createNode(position, static_cast<int>(params[4]), static_cast<int>(params[5]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_ConnectPathNodes(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 4) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 4) return 0;
 	return s_pathModule->connectNodes(static_cast<int>(params[1]), static_cast<int>(params[2]), params[3] != 0, amx_ctof(params[4])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_DisconnectPathNodes(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 3) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 3) return 0;
 	return s_pathModule->disconnectNodes(static_cast<int>(params[1]), static_cast<int>(params[2]), params[3] != 0) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetNearestPathNode(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 6) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 6) return 0;
 	const Vec3 position { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
 	return s_pathModule->nearestNode(position, static_cast<int>(params[4]), static_cast<int>(params[5]), amx_ctof(params[6]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_FindPath(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 2) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 2) return 0;
 	return s_pathModule->findPath(static_cast<int>(params[1]), static_cast<int>(params[2]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_DestroyPath(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->destroyRoute(static_cast<int>(params[1])) ? 1 : 0;
 }
 
@@ -864,19 +864,19 @@ static cell AMX_NATIVE_CALL n_WS_GetPathCacheSize(AMX*, cell*)
 
 static cell AMX_NATIVE_CALL n_WS_GetPathLength(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->routeLength(static_cast<int>(params[1]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetPathNode(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 2) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 2) return 0;
 	return s_pathModule->routeNode(static_cast<int>(params[1]), static_cast<int>(params[2]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetPathPoint(AMX* amx, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
 	Vec3 point;
 	if (!s_pathModule->routePoint(static_cast<int>(params[1]), static_cast<int>(params[2]), point)) return 0;
 	return setPawnCell(amx, s_pathModule->pawnRef(), params[3], amx_ftoc(point.x))
@@ -888,13 +888,13 @@ static cell AMX_NATIVE_CALL n_WS_GetPathPoint(AMX* amx, cell* params)
 
 static cell AMX_NATIVE_CALL n_WS_CreateNPCPath(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 2) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 2) return 0;
 	return s_pathModule->createNPCPath(static_cast<int>(params[1]), amx_ctof(params[2]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_MoveNPCByPath(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
 	return s_pathModule->moveNPCByRoute(
 		static_cast<int>(params[1]),
 		static_cast<int>(params[2]),
@@ -907,7 +907,7 @@ static cell AMX_NATIVE_CALL n_WS_MoveNPCByPath(AMX*, cell* params)
 
 static cell AMX_NATIVE_CALL n_WS_NPCGoTo(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 8) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 9) return 0;
 	const Vec3 destination { amx_ctof(params[2]), amx_ctof(params[3]), amx_ctof(params[4]) };
 	return s_pathModule->npcGoTo(
 		static_cast<int>(params[1]),
@@ -921,13 +921,13 @@ static cell AMX_NATIVE_CALL n_WS_NPCGoTo(AMX*, cell* params)
 
 static cell AMX_NATIVE_CALL n_WS_SetPathDebug(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->setPathDebug(params[1] != 0) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_DebugPathRoute(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->showRouteDebug(static_cast<int>(params[1])) ? 1 : 0;
 }
 
@@ -940,7 +940,7 @@ static cell AMX_NATIVE_CALL n_WS_ClearPathDebug(AMX*, cell*)
 
 static cell AMX_NATIVE_CALL n_WS_CreatePatrol(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
 	return s_pathModule->createPatrol(
 		static_cast<int>(params[1]),
 		static_cast<int>(params[2]),
@@ -951,49 +951,49 @@ static cell AMX_NATIVE_CALL n_WS_CreatePatrol(AMX*, cell* params)
 
 static cell AMX_NATIVE_CALL n_WS_StartPatrol(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->startPatrol(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_StopPatrol(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->stopPatrol(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_PausePatrol(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->pausePatrol(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_ResumePatrol(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->resumePatrol(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_DestroyPatrol(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->destroyPatrol(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_IsPatrolActive(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->isPatrolActive(static_cast<int>(params[1])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetPatrolRoute(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->getPatrolRoute(static_cast<int>(params[1]));
 }
 
 static cell AMX_NATIVE_CALL n_WS_GetPatrolNPC(AMX*, cell* params)
 {
-	if (!s_pathModule || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
 	return s_pathModule->getPatrolNPC(static_cast<int>(params[1]));
 }
 
