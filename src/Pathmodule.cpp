@@ -845,12 +845,18 @@ void PathModule::onNPCDestroy(INPC& npc)
 	npcSpatialDirty_ = true;
 }
 
-std::vector<PathEdge> PathModule::getEdges(int nodeID) const
+const std::vector<PathEdge>& PathModule::getEdges(int nodeID) const
 {
+	const auto cached = edgeCache_.find(nodeID);
+	if (cached != edgeCache_.end())
+	{
+		return cached->second;
+	}
+
 	std::string encoded;
 	if (!core_.getState(nodeID, PATH_KEY_EDGES, encoded) || encoded.empty())
 	{
-		return {};
+		return edgeCache_[nodeID];
 	}
 
 	std::vector<PathEdge> edges;
@@ -869,7 +875,8 @@ std::vector<PathEdge> PathModule::getEdges(int nodeID) const
 			edges.push_back(PathEdge { node, cost });
 		}
 	}
-	return edges;
+	edgeCache_[nodeID] = edges;
+	return edgeCache_[nodeID];
 }
 
 void PathModule::setEdges(int nodeID, const std::vector<PathEdge>& edges)
@@ -886,6 +893,7 @@ void PathModule::setEdges(int nodeID, const std::vector<PathEdge>& edges)
 		first = false;
 	}
 	core_.setState(nodeID, PATH_KEY_EDGES, stream.str());
+	edgeCache_[nodeID] = edges;
 }
 
 bool PathModule::upsertEdge(int fromNode, int toNode, float cost)

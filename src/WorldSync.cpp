@@ -311,6 +311,10 @@ bool WorldSyncCore::setState(int id, std::string key, std::string value)
 	const std::string eventKey = key;
 	const auto existing = entity->state.find(eventKey);
 	const std::string oldValue = existing == entity->state.end() ? std::string() : existing->second;
+	if (existing != entity->state.end() && oldValue == value)
+	{
+		return true;
+	}
 	entity->state[std::move(key)] = value;
 	entity->dirty = true;
 	fireEntityStateChanged(*entity, eventKey, oldValue, value);
@@ -337,6 +341,45 @@ bool WorldSyncCore::getState(int id, const std::string& key, std::string& value)
 	}
 	value = it->second;
 	return true;
+}
+
+int WorldSyncCore::getStateInt(int id, const std::string& key, int fallback) const
+{
+	std::string value;
+	if (!getState(id, key, value) || value.empty())
+	{
+		return fallback;
+	}
+	return parseInt(value, fallback);
+}
+
+float WorldSyncCore::getStateFloat(int id, const std::string& key, float fallback) const
+{
+	std::string value;
+	float parsed = fallback;
+	if (!getState(id, key, value) || value.empty() || !parseFloat(value, parsed))
+	{
+		return fallback;
+	}
+	return parsed;
+}
+
+bool WorldSyncCore::getStateBool(int id, const std::string& key, bool fallback) const
+{
+	std::string value;
+	if (!getState(id, key, value) || value.empty())
+	{
+		return fallback;
+	}
+	if (value == "1" || value == "true" || value == "TRUE" || value == "yes" || value == "on")
+	{
+		return true;
+	}
+	if (value == "0" || value == "false" || value == "FALSE" || value == "no" || value == "off")
+	{
+		return false;
+	}
+	return fallback;
 }
 
 bool WorldSyncCore::getType(int id, std::string& type) const
@@ -483,6 +526,41 @@ int WorldSyncCore::findNearestEntity(Vec3 position, int world, int interior, flo
 	}
 
 	return bestEntity;
+}
+
+std::vector<int> WorldSyncCore::findEntitiesByState(const std::string& type, const std::string& key, const std::string& value, size_t maxResults) const
+{
+	std::vector<int> result;
+	if (key.empty())
+	{
+		return result;
+	}
+
+	for (const Entity& entity : entities_)
+	{
+		if (!type.empty() && entity.type != type)
+		{
+			continue;
+		}
+
+		const auto it = entity.state.find(key);
+		if (it == entity.state.end() || it->second != value)
+		{
+			continue;
+		}
+
+		result.push_back(entity.id);
+		if (maxResults > 0 && result.size() >= maxResults)
+		{
+			return result;
+		}
+	}
+	return result;
+}
+
+int WorldSyncCore::countEntitiesByState(const std::string& type, const std::string& key, const std::string& value) const
+{
+	return static_cast<int>(findEntitiesByState(type, key, value, 0).size());
 }
 
 bool WorldSyncCore::setSimulated(int id, bool enabled)
@@ -835,8 +913,9 @@ bool WorldSyncCore::initSQLiteSchema()
 		return false;
 	}
 
+	constexpr int CurrentSchemaVersion = 3;
 	const int version = sqliteSchemaVersion();
-	if (version > 1)
+	if (version > CurrentSchemaVersion)
 	{
 		log(LogLevelFilter::Warning, "WorldSync: DB schema_version=%d es mas nuevo que este plugin.", version);
 	}
@@ -858,16 +937,17 @@ bool WorldSyncCore::initSQLiteSchema()
 			"PRIMARY KEY(entity_id, key),"
 			"FOREIGN KEY(entity_id) REFERENCES worlds_entities(id) ON DELETE CASCADE"
 			")")
-		&& execSQL("CREATE INDEX IF NOT EXISTS idx_worlds_entities_type ON worlds_entities(type)");
+		&& execSQL("CREATE INDEX IF NOT EXISTS idx_worlds_entities_type ON worlds_entities(type)")
+		&& execSQL("CREATE INDEX IF NOT EXISTS idx_worlds_state_key_value ON worlds_state(key,value)");
 
 	if (!ok)
 	{
 		return false;
 	}
 
-	if (version <= 0)
+	if (version < CurrentSchemaVersion)
 	{
-		return setSQLiteSchemaVersion(1);
+		return setSQLiteSchemaVersion(CurrentSchemaVersion);
 	}
 	return true;
 }

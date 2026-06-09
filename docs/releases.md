@@ -11,13 +11,13 @@ Early adopters should receive both source and precompiled artifacts:
 ## Recommended Release Layout
 
 ```text
-WorldSync-v0.1.0-windows-x64.zip
+WorldSync-v0.3.0-windows-x64.zip
   components/WorldSync.dll
   pawno/include/worldsync.inc
   docs/
   examples/
 
-WorldSync-v0.1.0-linux-x64.tar.gz
+WorldSync-v0.3.0-linux-x64.tar.gz
   components/WorldSync.so
   pawno/include/worldsync.inc
   docs/
@@ -47,13 +47,13 @@ build/Release/WorldSync.dll
 After the Windows build and tests pass, create the release archive:
 
 ```powershell
-.\scripts\package-windows.ps1 -Version v0.1.0
+.\scripts\package-windows.ps1 -Version v0.3.0
 ```
 
 The generated archive is:
 
 ```text
-dist/WorldSync-v0.1.0-windows-x64.zip
+dist/WorldSync-v0.3.0-windows-x64.zip
 ```
 
 ## Linux Build
@@ -85,7 +85,7 @@ build/libWorldSync.so
 - Verify NPC patrol if NPCs is loaded.
 - Package `.dll`, `.so`, `worldsync.inc`, docs and examples.
 - Include `CHANGELOG.md` in release notes.
-- Create Git tag, for example `v0.1.0`.
+- Create Git tag, for example `v0.3.0`.
 - Publish archives in GitHub Releases.
 
 ## Current Local Build Status

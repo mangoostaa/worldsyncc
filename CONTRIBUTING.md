@@ -26,13 +26,13 @@ build/Release/WorldSync.dll
 After a successful Release build and test run:
 
 ```powershell
-.\scripts\package-windows.ps1 -Version v0.1.0
+.\scripts\package-windows.ps1 -Version v0.3.0
 ```
 
 This creates:
 
 ```text
-dist/WorldSync-v0.1.0-windows-x64.zip
+dist/WorldSync-v0.3.0-windows-x64.zip
 ```
 
 ## Contribution Guidelines

@@ -85,9 +85,14 @@ void testCoreEntityLifecycle()
 	assert(!core.setState(id, "", "bad"));
 	assert(!core.getState(id, "", value));
 	assert(core.setState(id, "locked", "1"));
+	assert(core.setState(id, "owner", "42"));
+	assert(core.setState(id, "price", "125.5"));
 
 	assert(core.getState(id, "locked", value));
 	assert(value == "1");
+	assert(core.getStateBool(id, "locked", false));
+	assert(core.getStateInt(id, "owner", 0) == 42);
+	assertNear(core.getStateFloat(id, "price", 0.0f), 125.5f);
 
 	worlds::Vec3 position;
 	assert(core.getPosition(id, position));
@@ -107,6 +112,10 @@ void testCoreEntityLifecycle()
 	assert(stats.saves == 1);
 	assert(stats.lastSaveCount == 1);
 	assert(stats.lastSaveChanged == 1);
+
+	assert(core.setState(id, "owner", "42"));
+	stats = core.stats();
+	assert(stats.dirtyEntities == 0);
 }
 
 void testFallbackPersistenceRoundTrip()
@@ -158,6 +167,9 @@ void testSpatialGridQueries()
 	const int crop = core.createEntity("crop", worlds::Vec3 { 10.0f, 0.0f, 0.0f }, 0, 0);
 	const int farCrop = core.createEntity("crop", worlds::Vec3 { 200.0f, 0.0f, 0.0f }, 0, 0);
 	const int otherWorld = core.createEntity("crop", worlds::Vec3 { 5.0f, 0.0f, 0.0f }, 1, 0);
+	assert(core.setState(crop, "ready", "1"));
+	assert(core.setState(farCrop, "ready", "1"));
+	assert(core.setState(otherWorld, "ready", "1"));
 
 	assert(core.findNearestEntity(worlds::Vec3 { 8.0f, 0.0f, 0.0f }, 0, 0, 50.0f) == crop);
 	assert(core.findNearestEntity(worlds::Vec3 { 8.0f, 0.0f, 0.0f }, 0, 0, 50.0f, "door") == door);
@@ -176,6 +188,10 @@ void testSpatialGridQueries()
 	assert(core.setPosition(farCrop, worlds::Vec3 { 6.0f, 0.0f, 0.0f }));
 	assert(core.findNearestEntity(worlds::Vec3 { 6.0f, 0.0f, 0.0f }, 0, 0, 10.0f, "crop") == farCrop);
 	assert(core.findNearestEntity(worlds::Vec3 { 200.0f, 0.0f, 0.0f }, 0, 0, 10.0f, "crop") == 0);
+
+	std::vector<int> readyCrops = core.findEntitiesByState("crop", "ready", "1", 2);
+	assert(readyCrops.size() == 2);
+	assert(core.countEntitiesByState("crop", "ready", "1") == 2);
 }
 
 void testCoreEventCallbacks()
@@ -201,6 +217,8 @@ void testCoreEventCallbacks()
 	assert(events.stateChanged == 2);
 	assert(events.lastOldValue == "10");
 	assert(events.lastNewValue == "11");
+	assert(core.setState(entity, "owner", "11"));
+	assert(events.stateChanged == 2);
 
 	assert(core.saveAll() == 1);
 	assert(events.saved == 1);

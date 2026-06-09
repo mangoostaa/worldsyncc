@@ -122,7 +122,7 @@ private:
 	int storeRoute(std::vector<int> nodes);
 	void rebuildNPCSpatialGrid();
 
-	std::vector<PathEdge> getEdges(int nodeID) const;
+	const std::vector<PathEdge>& getEdges(int nodeID) const;
 	void setEdges(int nodeID, const std::vector<PathEdge>& edges);
 	bool upsertEdge(int fromNode, int toNode, float cost);
 	bool removeEdge(int fromNode, int toNode);
@@ -162,6 +162,7 @@ private:
 	std::unordered_map<int, Route> routes_;
 	std::unordered_map<std::string, std::vector<int>> routeCache_;
 	std::unordered_map<int, Patrol> patrols_;
+	mutable std::unordered_map<int, std::vector<PathEdge>> edgeCache_;
 	std::unordered_map<NPCSpatialCell, std::vector<int>, NPCSpatialCellHash> npcSpatialGrid_;
 	std::unordered_map<int, NPCSpatialEntry> npcSpatialEntries_;
 	std::vector<int> debugLabelIDs_;

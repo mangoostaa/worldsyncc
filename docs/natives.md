@@ -40,8 +40,14 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 | `WS_CreateEntity(const type[], Float:x, Float:y, Float:z, world = 0, interior = 0)` | Creates a generic persistent entity. | `type`: string type. `x/y/z`: position. `world/interior`: scope. | `new id = WS_CreateEntity("stash", 10.0, 20.0, 5.0);` |
 | `WS_DestroyEntity(entityid)` | Deletes an entity and queues the deletion for persistence. | `entityid`: WorldSync entity ID. | `WS_DestroyEntity(id);` |
 | `bool:WS_EntityExists(entityid)` | Checks whether an entity exists. | `entityid`: WorldSync entity ID. | `if (WS_EntityExists(id)) { }` |
-| `WS_SetState(entityid, const key[], const value[])` | Sets a string state value and marks the entity dirty. | `key`: state key. `value`: state value. | `WS_SetState(id, "owner", "42");` |
+| `WS_SetState(entityid, const key[], const value[])` | Sets a string state value. If the value did not change, the entity is not marked dirty. | `key`: state key. `value`: state value. | `WS_SetState(id, "owner", "42");` |
 | `WS_GetState(entityid, const key[], value[], size = sizeof(value))` | Reads a string state value into `value`. | `value`: output buffer. | `new v[32]; WS_GetState(id, "owner", v);` |
+| `WS_SetStateInt(entityid, const key[], value)` | Stores an integer state value. | Entity, key and value. | `WS_SetStateInt(id, "owner", 42);` |
+| `WS_GetStateInt(entityid, const key[], fallback = 0)` | Reads an integer state value with fallback. | Entity, key and fallback. | `new owner = WS_GetStateInt(id, "owner", -1);` |
+| `WS_SetStateFloat(entityid, const key[], Float:value)` | Stores a float state value. | Entity, key and value. | `WS_SetStateFloat(id, "tax", 12.5);` |
+| `Float:WS_GetStateFloat(entityid, const key[], Float:fallback = 0.0)` | Reads a float state value with fallback. | Entity, key and fallback. | `new Float:tax = WS_GetStateFloat(id, "tax");` |
+| `WS_SetStateBool(entityid, const key[], bool:value)` | Stores a boolean state value as `1` or `0`. | Entity, key and value. | `WS_SetStateBool(id, "locked", true);` |
+| `bool:WS_GetStateBool(entityid, const key[], bool:fallback = false)` | Reads a boolean state value with fallback. | Entity, key and fallback. | `if (WS_GetStateBool(id, "locked")) { }` |
 | `WS_GetEntityType(entityid, type[], size = sizeof(type))` | Reads the entity type. | `type`: output buffer. | `new t[32]; WS_GetEntityType(id, t);` |
 | `WS_GetEntityPos(entityid, &Float:x, &Float:y, &Float:z)` | Reads the entity position. | `x/y/z`: output references. | `WS_GetEntityPos(id, x, y, z);` |
 | `WS_SetEntityPos(entityid, Float:x, Float:y, Float:z)` | Updates entity position and reindexes it in the spatial grid. | Entity ID and new position. | `WS_SetEntityPos(id, x, y, z);` |
@@ -51,6 +57,8 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 | `WS_GetEntityIDAt(index)` | Returns the entity ID at an index in the loaded entity list. | `index`: zero-based index. | `new id = WS_GetEntityIDAt(i);` |
 | `WS_GetNearestEntity(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0, const type[] = "")` | Uses the spatial grid to find the closest entity. If `type` is empty, any type matches. | Position, scope, max distance, optional type filter. | `new crop = WS_GetNearestEntity(x, y, z, 0, 0, 25.0, "crop");` |
 | `WS_GetEntitiesInRange(Float:x, Float:y, Float:z, entityids[], maxEntities = sizeof(entityids), virtualworld = 0, interior = 0, Float:radius = 50.0, const type[] = "")` | Fills `entityids` with nearby entity IDs and returns the number written. | Output array, max output count, scope, radius, optional type. | `new ids[16]; new n = WS_GetEntitiesInRange(x, y, z, ids, sizeof(ids), 0, 0, 20.0);` |
+| `WS_FindEntitiesByState(const type[], const key[], const value[], entityids[], maxEntities = sizeof(entityids))` | Finds loaded entities by optional type plus exact state key/value. Empty `type` matches any type. | Type filter, key, value and output array. | `new ids[16]; new n = WS_FindEntitiesByState("vehicle", "owner", "42", ids);` |
+| `WS_CountEntitiesByState(const type[], const key[], const value[])` | Counts loaded entities by optional type plus exact state key/value. | Type filter, key and value. | `new ready = WS_CountEntitiesByState("crop", "ready", "1");` |
 | `WS_SetSimulated(entityid, bool:enabled)` | Enables generic simulation ticking for an entity. | `enabled`: true/false. | `WS_SetSimulated(id, true);` |
 | `WS_Save(bool:dirtyOnly = true)` | Saves dirty entities or all entities. Returns changed count. | `dirtyOnly`: true for incremental save. | `WS_Save();` |
 | `WS_GetStats(stat)` | Reads a stat by constant. | `stat`: `WS_STAT_*`. | `WS_GetStats(WS_STAT_DIRTY_ENTITIES);` |

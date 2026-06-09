@@ -212,6 +212,74 @@ cell AMX_NATIVE_CALL WS_GetState(AMX* amx, cell* params)
 	return setPawnString(amx, params[3], value, static_cast<size_t>(params[4])) ? 1 : 0;
 }
 
+cell AMX_NATIVE_CALL WS_SetStateInt(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 3))
+	{
+		return 0;
+	}
+
+	const std::string key = pawnString(amx, params[2]);
+	return !key.empty() && gWorld->setState(static_cast<int>(params[1]), key, std::to_string(static_cast<int>(params[3]))) ? 1 : 0;
+}
+
+cell AMX_NATIVE_CALL WS_GetStateInt(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 3))
+	{
+		return 0;
+	}
+
+	const std::string key = pawnString(amx, params[2]);
+	return key.empty() ? static_cast<cell>(params[3]) : static_cast<cell>(gWorld->getStateInt(static_cast<int>(params[1]), key, static_cast<int>(params[3])));
+}
+
+cell AMX_NATIVE_CALL WS_SetStateFloat(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 3))
+	{
+		return 0;
+	}
+
+	const std::string key = pawnString(amx, params[2]);
+	return !key.empty() && gWorld->setState(static_cast<int>(params[1]), key, std::to_string(amx_ctof(params[3]))) ? 1 : 0;
+}
+
+cell AMX_NATIVE_CALL WS_GetStateFloat(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 3))
+	{
+		return amx_ftoc(0.0f);
+	}
+
+	const std::string key = pawnString(amx, params[2]);
+	const float fallback = amx_ctof(params[3]);
+	return amx_ftoc(key.empty() ? fallback : gWorld->getStateFloat(static_cast<int>(params[1]), key, fallback));
+}
+
+cell AMX_NATIVE_CALL WS_SetStateBool(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 3))
+	{
+		return 0;
+	}
+
+	const std::string key = pawnString(amx, params[2]);
+	return !key.empty() && gWorld->setState(static_cast<int>(params[1]), key, params[3] != 0 ? "1" : "0") ? 1 : 0;
+}
+
+cell AMX_NATIVE_CALL WS_GetStateBool(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 3))
+	{
+		return 0;
+	}
+
+	const std::string key = pawnString(amx, params[2]);
+	const bool fallback = params[3] != 0;
+	return key.empty() ? (fallback ? 1 : 0) : (gWorld->getStateBool(static_cast<int>(params[1]), key, fallback) ? 1 : 0);
+}
+
 cell AMX_NATIVE_CALL WS_GetEntityType(AMX* amx, cell* params)
 {
 	if (!gWorld || !checkParams(params, 3))
@@ -324,6 +392,43 @@ cell AMX_NATIVE_CALL WS_GetEntitiesInRange(AMX* amx, cell* params)
 	return fillPawnArray(amx, params[4], entities, maxEntities);
 }
 
+cell AMX_NATIVE_CALL WS_FindEntitiesByState(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 6) || params[5] <= 0)
+	{
+		return 0;
+	}
+
+	const int maxEntities = static_cast<int>(params[5]);
+	const std::string key = pawnString(amx, params[2]);
+	if (key.empty())
+	{
+		return 0;
+	}
+
+	const std::vector<int> entities = gWorld->findEntitiesByState(
+		pawnString(amx, params[1]),
+		key,
+		pawnString(amx, params[3]),
+		static_cast<size_t>(maxEntities));
+	return fillPawnArray(amx, params[4], entities, maxEntities);
+}
+
+cell AMX_NATIVE_CALL WS_CountEntitiesByState(AMX* amx, cell* params)
+{
+	if (!gWorld || !checkParams(params, 3))
+	{
+		return 0;
+	}
+
+	const std::string key = pawnString(amx, params[2]);
+	if (key.empty())
+	{
+		return 0;
+	}
+	return gWorld->countEntitiesByState(pawnString(amx, params[1]), key, pawnString(amx, params[3]));
+}
+
 cell AMX_NATIVE_CALL WS_SetSimulated(AMX*, cell* params)
 {
 	if (!gWorld || !checkParams(params, 2))
@@ -433,6 +538,12 @@ const AMX_NATIVE_INFO WorldSyncNatives[] = {
 	{ "WS_EntityExists", WS_EntityExists },
 	{ "WS_SetState", WS_SetState },
 	{ "WS_GetState", WS_GetState },
+	{ "WS_SetStateInt", WS_SetStateInt },
+	{ "WS_GetStateInt", WS_GetStateInt },
+	{ "WS_SetStateFloat", WS_SetStateFloat },
+	{ "WS_GetStateFloat", WS_GetStateFloat },
+	{ "WS_SetStateBool", WS_SetStateBool },
+	{ "WS_GetStateBool", WS_GetStateBool },
 	{ "WS_GetEntityType", WS_GetEntityType },
 	{ "WS_GetEntityPos", WS_GetEntityPos },
 	{ "WS_SetEntityPos", WS_SetEntityPos },
@@ -442,6 +553,8 @@ const AMX_NATIVE_INFO WorldSyncNatives[] = {
 	{ "WS_GetEntityIDAt", WS_GetEntityIDAt },
 	{ "WS_GetNearestEntity", WS_GetNearestEntity },
 	{ "WS_GetEntitiesInRange", WS_GetEntitiesInRange },
+	{ "WS_FindEntitiesByState", WS_FindEntitiesByState },
+	{ "WS_CountEntitiesByState", WS_CountEntitiesByState },
 	{ "WS_SetSimulated", WS_SetSimulated },
 	{ "WS_Save", WS_Save },
 	{ "WS_GetStats", WS_GetStats },
@@ -461,7 +574,7 @@ public:
 
 	SemanticVersion componentVersion() const override
 	{
-		return SemanticVersion(0, 1, 0);
+		return SemanticVersion(0, 3, 0);
 	}
 
 	void onLoad(ICore* c) override
@@ -471,7 +584,7 @@ public:
 		world_.addEventHandler(this);
 		gWorld = &world_;
 		core_->getEventDispatcher().addEventHandler(this);
-		core_->printLn("WorldSync v0.1.0 cargado.");
+		core_->printLn("WorldSync v0.3.0 cargado.");
 	}
 
 	void onInit(IComponentList* components) override

@@ -86,6 +86,9 @@ public:
 
 	bool setState(int id, std::string key, std::string value);
 	bool getState(int id, const std::string& key, std::string& value) const;
+	int getStateInt(int id, const std::string& key, int fallback) const;
+	float getStateFloat(int id, const std::string& key, float fallback) const;
+	bool getStateBool(int id, const std::string& key, bool fallback) const;
 	bool getType(int id, std::string& type) const;
 	bool getPosition(int id, Vec3& position) const;
 	bool setPosition(int id, Vec3 position);
@@ -94,6 +97,8 @@ public:
 	int getEntityIDAt(size_t index) const;
 	std::vector<int> findEntitiesInRange(Vec3 position, int world, int interior, float radius, const std::string& type = {}) const;
 	int findNearestEntity(Vec3 position, int world, int interior, float maxDistance, const std::string& type = {}) const;
+	std::vector<int> findEntitiesByState(const std::string& type, const std::string& key, const std::string& value, size_t maxResults) const;
+	int countEntitiesByState(const std::string& type, const std::string& key, const std::string& value) const;
 
 	bool setSimulated(int id, bool enabled);
 	void tick(std::chrono::milliseconds elapsed);
