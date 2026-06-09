@@ -19,6 +19,7 @@ namespace
 {
 worlds::WorldSyncCore* gWorld = nullptr;
 IPawnComponent* gPawn = nullptr;
+worlds::VehicleModule* gVehicleModule = nullptr;
 
 bool checkParams(cell* params, int count)
 {
@@ -395,7 +396,7 @@ cell AMX_NATIVE_CALL WS_GetEntitiesInRange(AMX* amx, cell* params)
 
 cell AMX_NATIVE_CALL WS_FindEntitiesByState(AMX* amx, cell* params)
 {
-	if (!gWorld || !checkParams(params, 6) || params[5] <= 0)
+	if (!gWorld || !checkParams(params, 5) || params[5] <= 0)
 	{
 		return 0;
 	}
@@ -444,6 +445,10 @@ cell AMX_NATIVE_CALL WS_Save(AMX*, cell* params)
 	if (!gWorld)
 	{
 		return 0;
+	}
+	if (gVehicleModule)
+	{
+		gVehicleModule->syncRuntimeVehicles();
 	}
 	const bool dirtyOnly = !checkParams(params, 1) || params[1] != 0;
 	return dirtyOnly ? gWorld->saveDirty() : gWorld->saveAll();
@@ -602,6 +607,7 @@ public:
 		cropModule_ = std::make_unique<worlds::CropModule>(world_, pawn_, core_);
 		pathModule_ = std::make_unique<worlds::PathModule>(world_, pawn_, npcs_, textLabels_, core_);
 		vehicleModule_ = std::make_unique<worlds::VehicleModule>(world_, pawn_, vehicles_, core_);
+		gVehicleModule = vehicleModule_.get();
 		if (pawn_)
 		{
 			pawn_->getEventDispatcher().addEventHandler(this);
@@ -653,6 +659,10 @@ public:
 	void onTick(Microseconds elapsed, TimePoint) override
 	{
 		const Milliseconds delta = duration_cast<Milliseconds>(elapsed);
+		if (vehicleModule_)
+		{
+			vehicleModule_->syncRuntimeVehicles();
+		}
 		world_.tick(delta);
 		if (cropModule_)
 		{
@@ -691,6 +701,10 @@ public:
 
 	void onFree(IComponent*) override
 	{
+		if (vehicleModule_)
+		{
+			vehicleModule_->syncRuntimeVehicles();
+		}
 		world_.removeEventHandler(this);
 		if (pawn_)
 		{
@@ -702,6 +716,7 @@ public:
 		}
 		world_.saveDirty();
 		world_.closeStorage();
+		gVehicleModule = nullptr;
 	}
 
 	void free() override

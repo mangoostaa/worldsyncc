@@ -268,23 +268,37 @@ int PathModule::createNPCPath(int routeID, float stopRange)
 {
 	if (!npcs_)
 	{
-		return 0;
+		return -1;
 	}
 
 	const auto it = routes_.find(routeID);
 	if (it == routes_.end() || it->second.nodes.empty())
 	{
-		return 0;
+		return -1;
 	}
 
 	const int pathID = npcs_->createPath();
+	if (pathID < 0)
+	{
+		return -1;
+	}
+
+	int points = 0;
 	for (int nodeID : it->second.nodes)
 	{
 		Vec3 position;
 		if (core_.getPosition(nodeID, position))
 		{
-			npcs_->addPointToPath(pathID, toVector3(position), stopRange);
+			if (npcs_->addPointToPath(pathID, toVector3(position), stopRange))
+			{
+				++points;
+			}
 		}
+	}
+	if (points == 0)
+	{
+		npcs_->destroyPath(pathID);
+		return -1;
 	}
 	return pathID;
 }
@@ -303,7 +317,7 @@ bool PathModule::moveNPCByRoute(int npcID, int routeID, NPCMoveType moveType, fl
 	}
 
 	const int pathID = createNPCPath(routeID, 1.0f);
-	if (!pathID)
+	if (pathID < 0)
 	{
 		return false;
 	}
@@ -616,10 +630,10 @@ bool PathModule::stopPatrol(int patrolID)
 	{
 		npc->stopPath();
 	}
-	if (patrol->npcPathID)
+	if (patrol->npcPathID >= 0)
 	{
 		npcs_->destroyPath(patrol->npcPathID);
-		patrol->npcPathID = 0;
+		patrol->npcPathID = -1;
 	}
 	patrol->active = false;
 	return true;
@@ -825,10 +839,10 @@ void PathModule::onNPCFinishMovePath(INPC& npc, int pathId)
 		return;
 	}
 
-	if (patrol->npcPathID)
+	if (patrol->npcPathID >= 0)
 	{
 		npcs_->destroyPath(patrol->npcPathID);
-		patrol->npcPathID = 0;
+		patrol->npcPathID = -1;
 	}
 	patrol->active = false;
 
@@ -1037,14 +1051,14 @@ bool PathModule::startPatrol(Patrol& patrol)
 		return false;
 	}
 
-	if (patrol.npcPathID)
+	if (patrol.npcPathID >= 0)
 	{
 		npcs_->destroyPath(patrol.npcPathID);
-		patrol.npcPathID = 0;
+		patrol.npcPathID = -1;
 	}
 
 	patrol.npcPathID = createNPCPath(patrol.routeID, 1.0f);
-	if (!patrol.npcPathID)
+	if (patrol.npcPathID < 0)
 	{
 		patrol.active = false;
 		return false;

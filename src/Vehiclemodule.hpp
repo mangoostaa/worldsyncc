@@ -37,6 +37,7 @@ public:
 	void rebuildVehicles();
 	bool createRuntimeVehicle(int vehicleEntityID);
 	bool destroyRuntimeVehicle(int vehicleEntityID);
+	void syncRuntimeVehicles();
 	int getRuntimeVehicleID(int vehicleEntityID) const;
 
 	int getModel(int vehicleEntityID) const;

@@ -1,5 +1,6 @@
 #include "Vehiclemodule.hpp"
 
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 
@@ -162,6 +163,59 @@ bool VehicleModule::destroyRuntimeVehicle(int vehicleEntityID)
 	}
 	runtimeVehicles_.erase(it);
 	return true;
+}
+
+void VehicleModule::syncRuntimeVehicles()
+{
+	if (!vehicles_)
+	{
+		return;
+	}
+
+	for (const auto& item : runtimeVehicles_)
+	{
+		const int vehicleEntityID = item.first;
+		IVehicle* vehicle = vehicles_->get(item.second);
+		if (!vehicle || !isVehicle(vehicleEntityID))
+		{
+			continue;
+		}
+
+		const Vector3 runtimePosition = vehicle->getPosition();
+		Vec3 storedPosition;
+		if (core_.getPosition(vehicleEntityID, storedPosition))
+		{
+			const bool moved = std::fabs(storedPosition.x - runtimePosition.x) > 0.01f
+				|| std::fabs(storedPosition.y - runtimePosition.y) > 0.01f
+				|| std::fabs(storedPosition.z - runtimePosition.z) > 0.01f;
+			if (moved)
+			{
+				core_.setPosition(vehicleEntityID, Vec3 { runtimePosition.x, runtimePosition.y, runtimePosition.z });
+			}
+		}
+
+		const float runtimeZAngle = vehicle->getZAngle();
+		if (std::fabs(getZRotation(vehicleEntityID) - runtimeZAngle) > 0.1f)
+		{
+			setFloat(vehicleEntityID, VEHICLE_KEY_ZROT, runtimeZAngle);
+		}
+
+		const float runtimeHealth = vehicle->getHealth();
+		if (std::fabs(getFloat(vehicleEntityID, VEHICLE_KEY_HEALTH, 1000.0f) - runtimeHealth) > 0.1f)
+		{
+			setFloat(vehicleEntityID, VEHICLE_KEY_HEALTH, runtimeHealth);
+		}
+
+		const auto colours = vehicle->getColour();
+		if (getInt(vehicleEntityID, VEHICLE_KEY_COLOUR1, -1) != colours.first)
+		{
+			setInt(vehicleEntityID, VEHICLE_KEY_COLOUR1, colours.first);
+		}
+		if (getInt(vehicleEntityID, VEHICLE_KEY_COLOUR2, -1) != colours.second)
+		{
+			setInt(vehicleEntityID, VEHICLE_KEY_COLOUR2, colours.second);
+		}
+	}
 }
 
 int VehicleModule::getRuntimeVehicleID(int vehicleEntityID) const

@@ -33,7 +33,7 @@ struct Patrol
 	int id = 0;
 	int npcID = 0;
 	int routeID = 0;
-	int npcPathID = 0;
+	int npcPathID = -1;
 	bool loop = false;
 	bool active = false;
 	NPCMoveType moveType = NPCMoveType_Auto;

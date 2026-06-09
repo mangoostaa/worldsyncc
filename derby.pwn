@@ -20,9 +20,17 @@ new gPathB;
 new gPathC;
 new gPathD;
 new gCropPickup = -1;
+new gGuardNpc = INVALID_NPC_ID;
+new gGuardPatrol;
 
 forward WorldSyncDemo_Init();
+forward WorldSyncDemo_StartNPC();
 forward WorldSyncDemo_Tick();
+
+main()
+{
+	print("[Derby/WorldSync] AMX cargado.");
+}
 
 stock DemoMsg(playerid, colour, const text[])
 {
@@ -43,14 +51,108 @@ stock DemoFindByState(const type[], const key[], const value[])
 	return count > 0 ? ids[0] : 0;
 }
 
+stock DemoDestroyTyped(const type[], entity)
+{
+	if (!strcmp(type, "door"))
+	{
+		return WS_DestroyDoor(entity);
+	}
+	if (!strcmp(type, "vehicle"))
+	{
+		return WS_DestroyVehicle(entity);
+	}
+	if (!strcmp(type, "crop"))
+	{
+		return WS_DestroyCrop(entity);
+	}
+	return WS_DestroyEntity(entity);
+}
+
+stock DemoKeepOneByState(const type[], const value[])
+{
+	new ids[32];
+	new count = WS_FindEntitiesByState(type, "demo", value, ids, sizeof(ids));
+	if (count <= 0)
+	{
+		return 0;
+	}
+
+	new keep = ids[0];
+	for (new i = 1; i < count; i++)
+	{
+		DemoDestroyTyped(type, ids[i]);
+	}
+	if (count > 1)
+	{
+		printf("[Derby/WorldSync] Removed %d duplicate %s demo=%s, keeping entity=%d", count - 1, type, value, keep);
+	}
+	return keep;
+}
+
 stock DemoCreateLabel(const text[], Float:x, Float:y, Float:z)
 {
 	Create3DTextLabel(text, COLOR_YELLOW, x, y, z, 35.0, DEMO_WORLD, true);
 }
 
+stock bool:DemoIsNear(Float:x, Float:y, Float:z, Float:tx, Float:ty, Float:tz, Float:radius)
+{
+	new Float:dx = x - tx;
+	new Float:dy = y - ty;
+	new Float:dz = z - tz;
+	return (dx * dx + dy * dy + dz * dz) <= (radius * radius);
+}
+
+stock DemoCleanupDemoVehicles()
+{
+	new keep = DemoFindByState("vehicle", "demo", "inferno");
+	new removed;
+	new total = WS_GetEntityCount();
+
+	for (new i = total - 1; i >= 0; i--)
+	{
+		new entity = WS_GetEntityIDAt(i);
+		new type[24];
+		if (!entity || !WS_GetEntityType(entity, type) || strcmp(type, "vehicle"))
+		{
+			continue;
+		}
+		if (WS_GetVehicleModel(entity) != 411)
+		{
+			continue;
+		}
+
+		new Float:x, Float:y, Float:z;
+		if (!WS_GetVehiclePos(entity, x, y, z) || !DemoIsNear(x, y, z, 1528.0, -1680.0, 13.4, 8.0))
+		{
+			continue;
+		}
+
+		if (!keep)
+		{
+			keep = entity;
+			WS_SetState(keep, "demo", "inferno");
+			WS_SetState(keep, "name", "Persistent Inferno");
+			continue;
+		}
+
+		if (entity != keep)
+		{
+			WS_DestroyVehicle(entity);
+			removed++;
+		}
+	}
+
+	if (removed > 0)
+	{
+		printf("[Derby/WorldSync] Removed %d duplicate demo vehicles, keeping entity=%d", removed, keep);
+		WS_Save(false);
+	}
+	return keep;
+}
+
 stock DemoSetupDoor()
 {
-	gDoor = DemoFindByState("door", "demo", "lspd_front");
+	gDoor = DemoKeepOneByState("door", "lspd_front");
 	if (!gDoor)
 	{
 		gDoor = WS_CreateDoor(
@@ -72,7 +174,7 @@ stock DemoSetupDoor()
 
 stock DemoSetupVehicle()
 {
-	gCar = DemoFindByState("vehicle", "demo", "inferno");
+	gCar = DemoCleanupDemoVehicles();
 	if (!gCar)
 	{
 		gCar = WS_CreateVehicle(411, 1528.0, -1680.0, 13.4, 90.0, 1, 1, 120, false, DEMO_WORLD, DEMO_INT);
@@ -87,7 +189,7 @@ stock DemoSetupVehicle()
 
 stock DemoSetupCrop()
 {
-	gCrop = DemoFindByState("crop", "demo", "corn_patch");
+	gCrop = DemoKeepOneByState("crop", "corn_patch");
 	if (!gCrop)
 	{
 		gCrop = WS_CreateCrop("corn", 1512.0, -1688.0, 13.5, 8.0, 5, DEMO_WORLD, DEMO_INT);
@@ -103,10 +205,10 @@ stock DemoSetupCrop()
 
 stock DemoSetupPath()
 {
-	gPathA = DemoFindByState("path_node", "demo", "a");
-	gPathB = DemoFindByState("path_node", "demo", "b");
-	gPathC = DemoFindByState("path_node", "demo", "c");
-	gPathD = DemoFindByState("path_node", "demo", "d");
+	gPathA = DemoKeepOneByState("path_node", "a");
+	gPathB = DemoKeepOneByState("path_node", "b");
+	gPathC = DemoKeepOneByState("path_node", "c");
+	gPathD = DemoKeepOneByState("path_node", "d");
 
 	if (!gPathA)
 	{
@@ -141,10 +243,91 @@ stock DemoSetupPath()
 	return gRoute;
 }
 
+stock DemoSetupNPC()
+{
+	if (gGuardNpc != INVALID_NPC_ID && NPC_IsValid(gGuardNpc))
+	{
+		NPC_Destroy(gGuardNpc);
+	}
+
+	gGuardNpc = NPC_Create("WS_Guard");
+	if (!NPC_IsValid(gGuardNpc))
+	{
+		printf("[Derby/WorldSync] No se pudo crear NPC WS_Guard, returned=%d. Revisa max_bots.", gGuardNpc);
+		gGuardNpc = INVALID_NPC_ID;
+		return 0;
+	}
+
+	NPC_SetSkin(gGuardNpc, 280);
+	NPC_SetPos(gGuardNpc, 1508.0, -1692.0, 13.5);
+	NPC_SetVirtualWorld(gGuardNpc, DEMO_WORLD);
+	NPC_SetInterior(gGuardNpc, DEMO_INT);
+	NPC_SetFacingAngle(gGuardNpc, 90.0);
+	NPC_SetInvulnerable(gGuardNpc, true);
+	NPC_Spawn(gGuardNpc);
+
+	DemoCreateLabel("WorldSync NPC\n/wsnpc patrol\n/wsnpcgo destino\n/wsnpcstop stop", 1508.0, -1692.0, 16.0);
+	printf("[Derby/WorldSync] NPC guard created npcid=%d route=%d", gGuardNpc, gRoute);
+	return gGuardNpc;
+}
+
+stock DemoStartNPCPatrolCore()
+{
+	if (gGuardNpc == INVALID_NPC_ID || !NPC_IsValid(gGuardNpc))
+	{
+		return 0;
+	}
+	if (!gRoute)
+	{
+		return 0;
+	}
+
+	if (gGuardPatrol && WS_IsPatrolActive(gGuardPatrol))
+	{
+		WS_StopPatrol(gGuardPatrol);
+	}
+	if (gGuardPatrol)
+	{
+		WS_DestroyPatrol(gGuardPatrol);
+		gGuardPatrol = 0;
+	}
+
+	NPC_SetPos(gGuardNpc, 1508.0, -1692.0, 13.5);
+	NPC_SetVirtualWorld(gGuardNpc, DEMO_WORLD);
+	NPC_SetInterior(gGuardNpc, DEMO_INT);
+	gGuardPatrol = WS_CreatePatrol(gGuardNpc, gRoute, true, WS_NPC_MOVE_WALK, -1.0);
+	if (!gGuardPatrol)
+	{
+		printf("[Derby/WorldSync] NPC patrol create failed npc=%d route=%d", gGuardNpc, gRoute);
+		return 0;
+	}
+
+	new started = WS_StartPatrol(gGuardPatrol);
+	printf("[Derby/WorldSync] NPC patrol start result=%d patrol=%d npc=%d route=%d active=%d",
+		started,
+		gGuardPatrol,
+		gGuardNpc,
+		gRoute,
+		WS_IsPatrolActive(gGuardPatrol) ? 1 : 0);
+	return started;
+}
+
+stock DemoStartNPCPatrol(playerid)
+{
+	if (!DemoStartNPCPatrolCore())
+	{
+		DemoMsg(playerid, COLOR_RED, "No se pudo iniciar patrol. Revisa NPC component, route y max_bots.");
+		return 0;
+	}
+	DemoMsg(playerid, COLOR_GREEN, "NPC patrol iniciado por nodos WorldSync.");
+	return 1;
+}
+
 stock DemoShowHelp(playerid)
 {
 	DemoMsg(playerid, COLOR_YELLOW, "WorldSync demo: /wsdemo /wsstats /wsdoor /wslock /wscar /wsrepair");
 	DemoMsg(playerid, COLOR_YELLOW, "WorldSync demo: /wscrop /wsgrow /wsharvest /wsnear /wspath /wsdebug /wssave");
+	DemoMsg(playerid, COLOR_YELLOW, "WorldSync NPC: /wsnpc /wsnpcgo /wsnpcstop /wsnpcnear");
 	DemoMsg(playerid, COLOR_GREY, "Tip: reinicia el server y vas a ver que las entidades vuelven desde SQLite.");
 	return 1;
 }
@@ -197,9 +380,17 @@ public WorldSyncDemo_Init()
 	DemoSetupVehicle();
 	DemoSetupCrop();
 	DemoSetupPath();
-	WS_Save(false);
+	DemoSetupNPC();
+	SetTimer("WorldSyncDemo_StartNPC", 2500, false);
+	WS_Save(true);
 	WS_DebugSummary();
 	print("[Derby/WorldSync] Demo lista. Usa /wshelp dentro del server.");
+	return 1;
+}
+
+public WorldSyncDemo_StartNPC()
+{
+	DemoStartNPCPatrolCore();
 	return 1;
 }
 
@@ -208,6 +399,18 @@ public WorldSyncDemo_Tick()
 	if (gCrop && WS_EntityExists(gCrop))
 	{
 		printf("[Derby/WorldSync] Crop %d growth=%d ready=%d harvests=%d", gCrop, WS_GetCropGrowth(gCrop), WS_IsCropReady(gCrop), WS_GetCropHarvests(gCrop));
+	}
+	if (gGuardNpc != INVALID_NPC_ID && NPC_IsValid(gGuardNpc))
+	{
+		new Float:x, Float:y, Float:z;
+		NPC_GetPos(gGuardNpc, x, y, z);
+		new patrolActive = (gGuardPatrol != 0 && WS_IsPatrolActive(gGuardPatrol)) ? 1 : 0;
+		printf("[Derby/WorldSync] NPC %d pos=%.2f %.2f %.2f nearest=%d patrol=%d active=%d",
+			gGuardNpc,
+			x, y, z,
+			WS_GetNearestNPC(x, y, z, DEMO_WORLD, DEMO_INT, 80.0),
+			gGuardPatrol,
+			patrolActive);
 	}
 	return 1;
 }
@@ -368,6 +571,52 @@ public OnPlayerCommandText(playerid, cmdtext[])
 		return 1;
 	}
 
+	if (!strcmp(cmdtext, "/wsnpc", true))
+	{
+		return DemoStartNPCPatrol(playerid);
+	}
+
+	if (!strcmp(cmdtext, "/wsnpcstop", true))
+	{
+		if (gGuardPatrol)
+		{
+			WS_StopPatrol(gGuardPatrol);
+			WS_DestroyPatrol(gGuardPatrol);
+			gGuardPatrol = 0;
+		}
+		if (gGuardNpc != INVALID_NPC_ID && NPC_IsValid(gGuardNpc))
+		{
+			NPC_StopMove(gGuardNpc);
+		}
+		DemoMsg(playerid, COLOR_YELLOW, "NPC patrol detenido.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsnpcgo", true))
+	{
+		if (gGuardNpc == INVALID_NPC_ID || !NPC_IsValid(gGuardNpc))
+		{
+			DemoMsg(playerid, COLOR_RED, "NPC no disponible.");
+			return 1;
+		}
+		WS_NPCGoTo(gGuardNpc, 1538.0, -1662.0, 13.5, DEMO_WORLD, DEMO_INT, 80.0, WS_NPC_MOVE_JOG, 0.65);
+		DemoMsg(playerid, COLOR_GREEN, "NPC enviado al nodo C con WS_NPCGoTo.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsnpcnear", true))
+	{
+		new Float:x, Float:y, Float:z, ids[8], line[128];
+		GetPlayerPos(playerid, x, y, z);
+		new nearest = WS_GetNearestNPC(x, y, z, DEMO_WORLD, DEMO_INT, 80.0);
+		new count = WS_GetNPCsInRange(x, y, z, ids, sizeof(ids), DEMO_WORLD, DEMO_INT, 80.0);
+		new canSee = (gGuardNpc != INVALID_NPC_ID && NPC_IsValid(gGuardNpc) && WS_IsPlayerInNPCSight(gGuardNpc, playerid, 80.0, 140.0, false)) ? 1 : 0;
+		format(line, sizeof(line), "NPCs cerca=%d nearest=%d guard=%d sight=%d", count, nearest, gGuardNpc,
+			canSee);
+		DemoMsg(playerid, COLOR_BLUE, line);
+		return 1;
+	}
+
 	if (!strcmp(cmdtext, "/wsdebug", true))
 	{
 		WS_SetPathDebug(false);
@@ -452,5 +701,27 @@ public OnWorldSyncCropReady(cropid)
 	new line[96];
 	format(line, sizeof(line), "[WorldSync] Crop %d listo para cosechar. Usa /wsharvest.", cropid);
 	DemoMsgAll(COLOR_GREEN, line);
+	return 1;
+}
+
+public OnWorldSyncPatrolStart(patrolid, npcid, routeid)
+{
+	new line[96];
+	format(line, sizeof(line), "[WorldSync] Patrol start patrol=%d npc=%d route=%d", patrolid, npcid, routeid);
+	DemoMsgAll(COLOR_GREEN, line);
+	return 1;
+}
+
+public OnWorldSyncPatrolPoint(patrolid, npcid, pointIndex)
+{
+	printf("[Derby/WorldSync] Patrol point patrol=%d npc=%d point=%d", patrolid, npcid, pointIndex);
+	return 1;
+}
+
+public OnWorldSyncPatrolComplete(patrolid, npcid, routeid)
+{
+	new line[96];
+	format(line, sizeof(line), "[WorldSync] Patrol complete patrol=%d npc=%d route=%d", patrolid, npcid, routeid);
+	DemoMsgAll(COLOR_YELLOW, line);
 	return 1;
 }
