@@ -172,6 +172,10 @@ void testSpatialGridQueries()
 
 	assert(core.destroyEntity(crop));
 	assert(core.findNearestEntity(worlds::Vec3 { 8.0f, 0.0f, 0.0f }, 0, 0, 50.0f, "crop") == 0);
+
+	assert(core.setPosition(farCrop, worlds::Vec3 { 6.0f, 0.0f, 0.0f }));
+	assert(core.findNearestEntity(worlds::Vec3 { 6.0f, 0.0f, 0.0f }, 0, 0, 10.0f, "crop") == farCrop);
+	assert(core.findNearestEntity(worlds::Vec3 { 200.0f, 0.0f, 0.0f }, 0, 0, 10.0f, "crop") == 0);
 }
 
 void testCoreEventCallbacks()

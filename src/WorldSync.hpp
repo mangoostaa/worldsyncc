@@ -88,6 +88,7 @@ public:
 	bool getState(int id, const std::string& key, std::string& value) const;
 	bool getType(int id, std::string& type) const;
 	bool getPosition(int id, Vec3& position) const;
+	bool setPosition(int id, Vec3 position);
 	int getWorld(int id) const;
 	int getInterior(int id) const;
 	int getEntityIDAt(size_t index) const;

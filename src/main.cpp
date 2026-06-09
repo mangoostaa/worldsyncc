@@ -248,6 +248,17 @@ cell AMX_NATIVE_CALL WS_GetEntityPos(AMX* amx, cell* params)
 		: 0;
 }
 
+cell AMX_NATIVE_CALL WS_SetEntityPos(AMX*, cell* params)
+{
+	if (!gWorld || !checkParams(params, 4))
+	{
+		return 0;
+	}
+
+	const worlds::Vec3 position { amx_ctof(params[2]), amx_ctof(params[3]), amx_ctof(params[4]) };
+	return gWorld->setPosition(static_cast<int>(params[1]), position) ? 1 : 0;
+}
+
 cell AMX_NATIVE_CALL WS_GetEntityWorld(AMX*, cell* params)
 {
 	return gWorld && checkParams(params, 1) ? gWorld->getWorld(static_cast<int>(params[1])) : 0;
@@ -424,6 +435,7 @@ const AMX_NATIVE_INFO WorldSyncNatives[] = {
 	{ "WS_GetState", WS_GetState },
 	{ "WS_GetEntityType", WS_GetEntityType },
 	{ "WS_GetEntityPos", WS_GetEntityPos },
+	{ "WS_SetEntityPos", WS_SetEntityPos },
 	{ "WS_GetEntityWorld", WS_GetEntityWorld },
 	{ "WS_GetEntityInterior", WS_GetEntityInterior },
 	{ "WS_GetEntityCount", WS_GetEntityCount },

@@ -44,6 +44,7 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 | `WS_GetState(entityid, const key[], value[], size = sizeof(value))` | Reads a string state value into `value`. | `value`: output buffer. | `new v[32]; WS_GetState(id, "owner", v);` |
 | `WS_GetEntityType(entityid, type[], size = sizeof(type))` | Reads the entity type. | `type`: output buffer. | `new t[32]; WS_GetEntityType(id, t);` |
 | `WS_GetEntityPos(entityid, &Float:x, &Float:y, &Float:z)` | Reads the entity position. | `x/y/z`: output references. | `WS_GetEntityPos(id, x, y, z);` |
+| `WS_SetEntityPos(entityid, Float:x, Float:y, Float:z)` | Updates entity position and reindexes it in the spatial grid. | Entity ID and new position. | `WS_SetEntityPos(id, x, y, z);` |
 | `WS_GetEntityWorld(entityid)` | Gets the entity virtual world. | `entityid`: WorldSync entity ID. | `new vw = WS_GetEntityWorld(id);` |
 | `WS_GetEntityInterior(entityid)` | Gets the entity interior. | `entityid`: WorldSync entity ID. | `new intid = WS_GetEntityInterior(id);` |
 | `WS_GetEntityCount()` | Returns loaded entity count. | None. | `printf("%d", WS_GetEntityCount());` |
@@ -123,6 +124,8 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 | `WS_NPCGoTo(npcid, Float:x, Float:y, Float:z, virtualworld = -1, interior = -1, Float:nodeSearchRadius = 80.0, moveType = WS_NPC_MOVE_AUTO, Float:speed = -1.0)` | Finds nearest start/end nodes, creates route and starts movement. | NPC, destination, optional scope/radius/move settings. | `WS_NPCGoTo(npcid, x, y, z);` |
 | `WS_GetNearestNPC(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0)` | Uses the runtime NPC spatial grid to find the closest NPC. | Position, scope and max distance. | `new npc = WS_GetNearestNPC(x, y, z, 0, 0, 30.0);` |
 | `WS_GetNPCsInRange(Float:x, Float:y, Float:z, npcids[], maxNPCs = sizeof(npcids), virtualworld = 0, interior = 0, Float:radius = 50.0)` | Fills `npcids` with nearby NPC IDs from the runtime NPC spatial grid. | Output array, max output count, scope and radius. | `new ids[8]; new n = WS_GetNPCsInRange(x, y, z, ids, sizeof(ids));` |
+| `WS_GetNearestPlayerToNPC(npcid, Float:maxDistance = 50.0, bool:includeBots = false)` | Finds the nearest player to an NPC in the same virtual world and interior. | NPC ID, max distance, bot inclusion flag. | `new playerid = WS_GetNearestPlayerToNPC(npcid, 40.0);` |
+| `bool:WS_IsPlayerInNPCSight(npcid, playerid, Float:maxDistance = 50.0, Float:fovDegrees = 120.0, bool:includeBots = false)` | Checks distance, scope and horizontal FOV from an NPC to a player. | NPC ID, player ID, distance, FOV and bot inclusion flag. | `if (WS_IsPlayerInNPCSight(npcid, playerid)) { }` |
 | `WS_SetPathDebug(bool:enabled)` | Shows or hides debug labels for path graph. | `enabled`: true/false. | `WS_SetPathDebug(true);` |
 | `WS_DebugPathRoute(pathid)` | Shows debug labels for one route. | `pathid`: route ID. | `WS_DebugPathRoute(route);` |
 | `WS_ClearPathDebug()` | Removes path debug labels. | None. | `WS_ClearPathDebug();` |

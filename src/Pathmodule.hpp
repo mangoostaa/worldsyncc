@@ -86,6 +86,8 @@ public:
 	void tickNPCSpatialGrid(std::chrono::milliseconds elapsed);
 	int findNearestNPC(Vec3 position, int virtualWorld, int interior, float maxDistance);
 	std::vector<int> findNPCsInRange(Vec3 position, int virtualWorld, int interior, float radius, size_t maxResults);
+	int findNearestPlayerToNPC(int npcID, float maxDistance, bool includeBots);
+	bool isPlayerInNPCSight(int npcID, int playerID, float maxDistance, float fovDegrees, bool includeBots);
 
 	int createPatrol(int npcID, int routeID, bool loop, NPCMoveType moveType, float speed);
 	bool startPatrol(int patrolID);

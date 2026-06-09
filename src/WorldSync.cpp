@@ -361,6 +361,21 @@ bool WorldSyncCore::getPosition(int id, Vec3& position) const
 	return true;
 }
 
+bool WorldSyncCore::setPosition(int id, Vec3 position)
+{
+	Entity* entity = findEntity(id);
+	if (!entity)
+	{
+		return false;
+	}
+
+	removeFromSpatialGrid(*entity);
+	entity->position = position;
+	entity->dirty = true;
+	addToSpatialGrid(*entity);
+	return true;
+}
+
 int WorldSyncCore::getWorld(int id) const
 {
 	const Entity* entity = findEntity(id);

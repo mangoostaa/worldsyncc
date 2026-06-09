@@ -26,6 +26,22 @@ bool setPawnCell(AMX* amx, IPawnComponent* pawn, cell address, cell value)
 	return true;
 }
 
+int fillPawnArray(AMX* amx, IPawnComponent* pawn, cell address, const std::vector<int>& values, int maxValues)
+{
+	if (!pawn || maxValues <= 0) return 0;
+	IPawnScript* script = pawn->getScript(amx);
+	if (!script) return 0;
+	cell* phys = nullptr;
+	if (script->GetAddr(address, &phys) != AMX_ERR_NONE || !phys) return 0;
+
+	const int written = std::min(static_cast<int>(values.size()), maxValues);
+	for (int i = 0; i < written; ++i)
+	{
+		phys[i] = static_cast<cell>(values[static_cast<size_t>(i)]);
+	}
+	return written;
+}
+
 std::vector<std::string> split(const std::string& value, char delimiter)
 {
 	std::vector<std::string> result;
@@ -463,6 +479,99 @@ std::vector<int> PathModule::findNPCsInRange(Vec3 position, int virtualWorld, in
 	}
 
 	return result;
+}
+
+int PathModule::findNearestPlayerToNPC(int npcID, float maxDistance, bool includeBots)
+{
+	if (!npcs_ || !omp_)
+	{
+		return 0;
+	}
+
+	INPC* npc = npcs_->get(npcID);
+	if (!npc)
+	{
+		return 0;
+	}
+
+	const Vector3 npcPosition = npc->getPosition();
+	const int npcWorld = npc->getVirtualWorld();
+	const int npcInterior = static_cast<int>(npc->getInterior());
+	float bestDistanceSq = maxDistance <= 0.0f ? std::numeric_limits<float>::max() : maxDistance * maxDistance;
+	int bestPlayer = 0;
+
+	IPlayerPool& playerPool = omp_->getPlayers();
+	const FlatPtrHashSet<IPlayer>& candidates = includeBots ? playerPool.entries() : playerPool.players();
+	for (IPlayer* player : candidates)
+	{
+		if (!player || player->getVirtualWorld() != npcWorld || static_cast<int>(player->getInterior()) != npcInterior)
+		{
+			continue;
+		}
+
+		const Vector3 playerPosition = player->getPosition();
+		const float dx = playerPosition.x - npcPosition.x;
+		const float dy = playerPosition.y - npcPosition.y;
+		const float dz = playerPosition.z - npcPosition.z;
+		const float current = dx * dx + dy * dy + dz * dz;
+		if (current <= bestDistanceSq)
+		{
+			bestDistanceSq = current;
+			bestPlayer = player->getID();
+		}
+	}
+
+	return bestPlayer;
+}
+
+bool PathModule::isPlayerInNPCSight(int npcID, int playerID, float maxDistance, float fovDegrees, bool includeBots)
+{
+	if (!npcs_ || !omp_ || playerID < 0)
+	{
+		return false;
+	}
+
+	INPC* npc = npcs_->get(npcID);
+	IPlayer* player = omp_->getPlayers().get(playerID);
+	if (!npc || !player || (!includeBots && player->isBot()))
+	{
+		return false;
+	}
+	if (player->getVirtualWorld() != npc->getVirtualWorld() || static_cast<int>(player->getInterior()) != static_cast<int>(npc->getInterior()))
+	{
+		return false;
+	}
+
+	const Vector3 npcPosition = npc->getPosition();
+	const Vector3 playerPosition = player->getPosition();
+	const float dx = playerPosition.x - npcPosition.x;
+	const float dy = playerPosition.y - npcPosition.y;
+	const float dz = playerPosition.z - npcPosition.z;
+	const float distanceSq = dx * dx + dy * dy + dz * dz;
+	if (maxDistance > 0.0f && distanceSq > maxDistance * maxDistance)
+	{
+		return false;
+	}
+	if (fovDegrees <= 0.0f || fovDegrees >= 360.0f)
+	{
+		return true;
+	}
+
+	const float horizontalSq = dx * dx + dy * dy;
+	if (horizontalSq <= 0.0001f)
+	{
+		return true;
+	}
+
+	const float angle = npc->getRotation().ToEuler().z * 3.1415926535f / 180.0f;
+	const float forwardX = std::sin(angle);
+	const float forwardY = std::cos(angle);
+	const float invDistance = 1.0f / std::sqrt(horizontalSq);
+	const float toPlayerX = dx * invDistance;
+	const float toPlayerY = dy * invDistance;
+	const float dot = forwardX * toPlayerX + forwardY * toPlayerY;
+	const float minDot = std::cos((fovDegrees * 0.5f) * 3.1415926535f / 180.0f);
+	return dot >= minDot;
 }
 
 int PathModule::createPatrol(int npcID, int routeID, bool loop, NPCMoveType moveType, float speed)
@@ -1133,20 +1242,26 @@ static cell AMX_NATIVE_CALL n_WS_GetNPCsInRange(AMX* amx, cell* params)
 		amx_ctof(params[8]),
 		static_cast<size_t>(maxNPCs));
 
-	int written = 0;
-	for (int npcID : npcs)
-	{
-		if (written >= maxNPCs)
-		{
-			break;
-		}
-		if (!setPawnCell(amx, s_pathModule->pawnRef(), params[4] + written, static_cast<cell>(npcID)))
-		{
-			break;
-		}
-		++written;
-	}
-	return written;
+	return fillPawnArray(amx, s_pathModule->pawnRef(), params[4], npcs, maxNPCs);
+}
+
+static cell AMX_NATIVE_CALL n_WS_GetNearestPlayerToNPC(AMX*, cell* params)
+{
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 3) return 0;
+	return s_pathModule->findNearestPlayerToNPC(static_cast<int>(params[1]), amx_ctof(params[2]), params[3] != 0);
+}
+
+static cell AMX_NATIVE_CALL n_WS_IsPlayerInNPCSight(AMX*, cell* params)
+{
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
+	return s_pathModule->isPlayerInNPCSight(
+		static_cast<int>(params[1]),
+		static_cast<int>(params[2]),
+		amx_ctof(params[3]),
+		amx_ctof(params[4]),
+		params[5] != 0)
+		? 1
+		: 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_SetPathDebug(AMX*, cell* params)
@@ -1244,6 +1359,8 @@ static const AMX_NATIVE_INFO PathNatives[] = {
 	{ "WS_NPCGoTo", n_WS_NPCGoTo },
 	{ "WS_GetNearestNPC", n_WS_GetNearestNPC },
 	{ "WS_GetNPCsInRange", n_WS_GetNPCsInRange },
+	{ "WS_GetNearestPlayerToNPC", n_WS_GetNearestPlayerToNPC },
+	{ "WS_IsPlayerInNPCSight", n_WS_IsPlayerInNPCSight },
 	{ "WS_SetPathDebug", n_WS_SetPathDebug },
 	{ "WS_DebugPathRoute", n_WS_DebugPathRoute },
 	{ "WS_ClearPathDebug", n_WS_ClearPathDebug },

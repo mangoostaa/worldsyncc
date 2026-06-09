@@ -33,6 +33,7 @@ native WS_SetState(entityid, const key[], const value[]);
 native WS_GetState(entityid, const key[], value[], size = sizeof(value));
 native WS_GetEntityType(entityid, type[], size = sizeof(type));
 native WS_GetEntityPos(entityid, &Float:x, &Float:y, &Float:z);
+native WS_SetEntityPos(entityid, Float:x, Float:y, Float:z);
 native WS_GetEntityWorld(entityid);
 native WS_GetEntityInterior(entityid);
 native WS_GetEntityCount();
@@ -96,6 +97,8 @@ native WS_MoveNPCByPath(npcid, pathid, moveType = WS_NPC_MOVE_AUTO, Float:speed 
 native WS_NPCGoTo(npcid, Float:x, Float:y, Float:z, virtualworld = -1, interior = -1, Float:nodeSearchRadius = 80.0, moveType = WS_NPC_MOVE_AUTO, Float:speed = -1.0);
 native WS_GetNearestNPC(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0);
 native WS_GetNPCsInRange(Float:x, Float:y, Float:z, npcids[], maxNPCs = sizeof(npcids), virtualworld = 0, interior = 0, Float:radius = 50.0);
+native WS_GetNearestPlayerToNPC(npcid, Float:maxDistance = 50.0, bool:includeBots = false);
+native bool:WS_IsPlayerInNPCSight(npcid, playerid, Float:maxDistance = 50.0, Float:fovDegrees = 120.0, bool:includeBots = false);
 native WS_SetPathDebug(bool:enabled);
 native WS_DebugPathRoute(pathid);
 native WS_ClearPathDebug();
