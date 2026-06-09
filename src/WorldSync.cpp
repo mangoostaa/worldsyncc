@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdarg>
+#include <cstdio>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -156,10 +157,19 @@ void WorldSyncCore::log(LogLevelFilter level, const char* fmt, ...) const
 		break;
 	}
 
+	char message[1024];
 	va_list args;
 	va_start(args, fmt);
-	logger_->vlogLn(sdkLevel, fmt, args);
+	const int written = std::vsnprintf(message, sizeof(message), fmt, args);
 	va_end(args);
+
+	if (written < 0)
+	{
+		return;
+	}
+
+	message[sizeof(message) - 1] = '\0';
+	logger_->logLn(sdkLevel, "%s", message);
 }
 
 void WorldSyncCore::addEventHandler(WorldSyncEventHandler* handler)

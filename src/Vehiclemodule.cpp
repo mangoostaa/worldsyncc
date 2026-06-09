@@ -123,6 +123,7 @@ bool VehicleModule::createRuntimeVehicle(int vehicleEntityID)
 
 	const int model = getModel(vehicleEntityID);
 	const int respawnDelay = getInt(vehicleEntityID, VEHICLE_KEY_RESPAWN, -1);
+	const int runtimeRespawnDelay = respawnDelay < 0 ? 0 : respawnDelay;
 	IVehicle* vehicle = vehicles_->create(
 		false,
 		model,
@@ -130,7 +131,7 @@ bool VehicleModule::createRuntimeVehicle(int vehicleEntityID)
 		getZRotation(vehicleEntityID),
 		getInt(vehicleEntityID, VEHICLE_KEY_COLOUR1, -1),
 		getInt(vehicleEntityID, VEHICLE_KEY_COLOUR2, -1),
-		Seconds(respawnDelay),
+		Seconds(runtimeRespawnDelay),
 		getBool(vehicleEntityID, VEHICLE_KEY_SIREN));
 	if (!vehicle)
 	{

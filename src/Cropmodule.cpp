@@ -277,9 +277,10 @@ static std::string amxGetStr(AMX* amx, IPawnComponent* pawn, cell address)
     if (script->GetAddr(address, &phys) != AMX_ERR_NONE || !phys) return {};
     int length = 0;
     script->StrLen(phys, &length);
-    std::string out(static_cast<size_t>(length), '\0');
+    std::string out(static_cast<size_t>(length) + 1, '\0');
     if (length > 0)
         script->GetString(&out[0], phys, false, static_cast<size_t>(length + 1));
+    out.resize(static_cast<size_t>(length));
     return out;
 }
 

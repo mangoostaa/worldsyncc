@@ -46,11 +46,12 @@ std::string pawnString(AMX* amx, cell address)
 
 	int length = 0;
 	script->StrLen(phys, &length);
-	std::string value(static_cast<size_t>(length), '\0');
+	std::string value(static_cast<size_t>(length) + 1, '\0');
 	if (length > 0)
 	{
 		script->GetString(&value[0], phys, false, static_cast<size_t>(length + 1));
 	}
+	value.resize(static_cast<size_t>(length));
 	return value;
 }
 

@@ -3,8 +3,8 @@
 #include <cstdint>
 
 #if defined(_WIN32)
-#define AMXAPI __stdcall
-#define AMX_NATIVE_CALL __stdcall
+#define AMXAPI
+#define AMX_NATIVE_CALL
 #else
 #define AMXAPI
 #define AMX_NATIVE_CALL

@@ -1,0 +1,456 @@
+#include <open.mp>
+#include <worldsync>
+
+#define COLOR_GREEN  0x33DD66FF
+#define COLOR_YELLOW 0xFFD447FF
+#define COLOR_RED    0xFF5544FF
+#define COLOR_BLUE   0x55AAFFFF
+#define COLOR_WHITE  0xFFFFFFFF
+#define COLOR_GREY   0xBBBBBBFF
+
+#define DEMO_WORLD   (0)
+#define DEMO_INT     (0)
+
+new gDoor;
+new gCar;
+new gCrop;
+new gRoute;
+new gPathA;
+new gPathB;
+new gPathC;
+new gPathD;
+new gCropPickup = -1;
+
+forward WorldSyncDemo_Init();
+forward WorldSyncDemo_Tick();
+
+stock DemoMsg(playerid, colour, const text[])
+{
+	SendClientMessage(playerid, colour, text);
+	return 1;
+}
+
+stock DemoMsgAll(colour, const text[])
+{
+	SendClientMessageToAll(colour, text);
+	return 1;
+}
+
+stock DemoFindByState(const type[], const key[], const value[])
+{
+	new ids[8];
+	new count = WS_FindEntitiesByState(type, key, value, ids, sizeof(ids));
+	return count > 0 ? ids[0] : 0;
+}
+
+stock DemoCreateLabel(const text[], Float:x, Float:y, Float:z)
+{
+	Create3DTextLabel(text, COLOR_YELLOW, x, y, z, 35.0, DEMO_WORLD, true);
+}
+
+stock DemoSetupDoor()
+{
+	gDoor = DemoFindByState("door", "demo", "lspd_front");
+	if (!gDoor)
+	{
+		gDoor = WS_CreateDoor(
+			1495,
+			1520.0, -1675.0, 13.5,
+			0.0, 0.0, 0.0,
+			0.0, 0.0, 90.0,
+			DEMO_WORLD, DEMO_INT
+		);
+		WS_SetState(gDoor, "demo", "lspd_front");
+		WS_SetState(gDoor, "name", "LSPD demo door");
+		WS_SetDoorLocked(gDoor, true);
+	}
+
+	DemoCreateLabel("WorldSync Door\n/wsdoor abre-cierra\n/wslock bloquea", 1520.0, -1675.0, 15.2);
+	printf("[Derby/WorldSync] Door entity=%d object=%d locked=%d open=%d", gDoor, WS_GetDoorObject(gDoor), WS_IsDoorLocked(gDoor), WS_IsDoorOpen(gDoor));
+	return gDoor;
+}
+
+stock DemoSetupVehicle()
+{
+	gCar = DemoFindByState("vehicle", "demo", "inferno");
+	if (!gCar)
+	{
+		gCar = WS_CreateVehicle(411, 1528.0, -1680.0, 13.4, 90.0, 1, 1, 120, false, DEMO_WORLD, DEMO_INT);
+		WS_SetState(gCar, "demo", "inferno");
+		WS_SetState(gCar, "name", "Persistent Inferno");
+	}
+
+	DemoCreateLabel("WorldSync Vehicle\n/wscar entrar\n/wsrepair reparar", 1528.0, -1680.0, 15.0);
+	printf("[Derby/WorldSync] Vehicle entity=%d runtime=%d health=%.1f", gCar, WS_GetVehicleID(gCar), WS_GetVehicleHealth(gCar));
+	return gCar;
+}
+
+stock DemoSetupCrop()
+{
+	gCrop = DemoFindByState("crop", "demo", "corn_patch");
+	if (!gCrop)
+	{
+		gCrop = WS_CreateCrop("corn", 1512.0, -1688.0, 13.5, 8.0, 5, DEMO_WORLD, DEMO_INT);
+		WS_SetState(gCrop, "demo", "corn_patch");
+		WS_SetState(gCrop, "name", "Corn patch");
+	}
+
+	gCropPickup = CreatePickup(1279, 1, 1512.0, -1688.0, 13.5, DEMO_WORLD);
+	DemoCreateLabel("WorldSync Crop\n/wscrop estado\n/wsgrow +25\n/wsharvest cosechar", 1512.0, -1688.0, 15.0);
+	printf("[Derby/WorldSync] Crop entity=%d growth=%d harvests=%d", gCrop, WS_GetCropGrowth(gCrop), WS_GetCropHarvests(gCrop));
+	return gCrop;
+}
+
+stock DemoSetupPath()
+{
+	gPathA = DemoFindByState("path_node", "demo", "a");
+	gPathB = DemoFindByState("path_node", "demo", "b");
+	gPathC = DemoFindByState("path_node", "demo", "c");
+	gPathD = DemoFindByState("path_node", "demo", "d");
+
+	if (!gPathA)
+	{
+		gPathA = WS_CreatePathNode(1508.0, -1692.0, 13.5, DEMO_WORLD, DEMO_INT);
+		WS_SetState(gPathA, "demo", "a");
+	}
+	if (!gPathB)
+	{
+		gPathB = WS_CreatePathNode(1538.0, -1692.0, 13.5, DEMO_WORLD, DEMO_INT);
+		WS_SetState(gPathB, "demo", "b");
+	}
+	if (!gPathC)
+	{
+		gPathC = WS_CreatePathNode(1538.0, -1662.0, 13.5, DEMO_WORLD, DEMO_INT);
+		WS_SetState(gPathC, "demo", "c");
+	}
+	if (!gPathD)
+	{
+		gPathD = WS_CreatePathNode(1508.0, -1662.0, 13.5, DEMO_WORLD, DEMO_INT);
+		WS_SetState(gPathD, "demo", "d");
+	}
+
+	WS_ConnectPathNodes(gPathA, gPathB, true, 0.0);
+	WS_ConnectPathNodes(gPathB, gPathC, true, 0.0);
+	WS_ConnectPathNodes(gPathC, gPathD, true, 0.0);
+	WS_ConnectPathNodes(gPathD, gPathA, true, 0.0);
+	WS_ClearPathCache();
+	gRoute = WS_FindPath(gPathA, gPathC);
+
+	DemoCreateLabel("WorldSync Path\n/wspath muestra ruta\n/wsnearest busca nodo", 1508.0, -1692.0, 15.0);
+	printf("[Derby/WorldSync] Path route=%d length=%d cache=%d", gRoute, WS_GetPathLength(gRoute), WS_GetPathCacheSize());
+	return gRoute;
+}
+
+stock DemoShowHelp(playerid)
+{
+	DemoMsg(playerid, COLOR_YELLOW, "WorldSync demo: /wsdemo /wsstats /wsdoor /wslock /wscar /wsrepair");
+	DemoMsg(playerid, COLOR_YELLOW, "WorldSync demo: /wscrop /wsgrow /wsharvest /wsnear /wspath /wsdebug /wssave");
+	DemoMsg(playerid, COLOR_GREY, "Tip: reinicia el server y vas a ver que las entidades vuelven desde SQLite.");
+	return 1;
+}
+
+stock DemoTeleport(playerid)
+{
+	SetPlayerInterior(playerid, DEMO_INT);
+	SetPlayerVirtualWorld(playerid, DEMO_WORLD);
+	SetPlayerPos(playerid, 1515.0, -1685.0, 13.6);
+	SetPlayerFacingAngle(playerid, 45.0);
+	SetPlayerCheckpoint(playerid, 1520.0, -1675.0, 13.5, 3.0);
+	GameTextForPlayer(playerid, "WorldSync Demo", 2500, 3);
+	return 1;
+}
+
+stock DemoPrintStats(playerid)
+{
+	new line[144];
+	format(line, sizeof(line), "Entities=%d dirty=%d simulated=%d saves=%d loads=%d lastLoad=%d",
+		WS_GetEntityCount(),
+		WS_GetStats(WS_STAT_DIRTY_ENTITIES),
+		WS_GetStats(WS_STAT_SIMULATED_ENTITIES),
+		WS_GetStats(WS_STAT_SAVES),
+		WS_GetStats(WS_STAT_LOADS),
+		WS_GetStats(WS_STAT_LAST_LOAD_COUNT));
+	DemoMsg(playerid, COLOR_BLUE, line);
+	return 1;
+}
+
+public OnGameModeInit()
+{
+	SetGameModeText("WorldSync Derby Demo");
+	AddPlayerClass(0, 1515.0, -1685.0, 13.6, 45.0);
+
+	WS_SetLogLevel(WS_LOG_INFO);
+	WS_DebugSummary();
+
+	print("====================================");
+	print("   WorldSync - Interactive Demo");
+	print("====================================");
+
+	SetTimer("WorldSyncDemo_Init", 1000, false);
+	SetTimer("WorldSyncDemo_Tick", 7000, true);
+	return 1;
+}
+
+public WorldSyncDemo_Init()
+{
+	DemoSetupDoor();
+	DemoSetupVehicle();
+	DemoSetupCrop();
+	DemoSetupPath();
+	WS_Save(false);
+	WS_DebugSummary();
+	print("[Derby/WorldSync] Demo lista. Usa /wshelp dentro del server.");
+	return 1;
+}
+
+public WorldSyncDemo_Tick()
+{
+	if (gCrop && WS_EntityExists(gCrop))
+	{
+		printf("[Derby/WorldSync] Crop %d growth=%d ready=%d harvests=%d", gCrop, WS_GetCropGrowth(gCrop), WS_IsCropReady(gCrop), WS_GetCropHarvests(gCrop));
+	}
+	return 1;
+}
+
+public OnPlayerConnect(playerid)
+{
+	DemoMsg(playerid, COLOR_GREEN, "WorldSync demo cargada.");
+	DemoShowHelp(playerid);
+	return 1;
+}
+
+public OnPlayerSpawn(playerid)
+{
+	DemoTeleport(playerid);
+	return 1;
+}
+
+public OnPlayerEnterCheckpoint(playerid)
+{
+	DemoMsg(playerid, COLOR_YELLOW, "Checkpoint de puerta: usa /wsdoor o /wslock.");
+	return 1;
+}
+
+public OnPlayerPickUpPickup(playerid, pickupid)
+{
+	if (pickupid == gCropPickup)
+	{
+		new line[96];
+		format(line, sizeof(line), "Corn patch: growth=%d ready=%d harvests=%d", WS_GetCropGrowth(gCrop), WS_IsCropReady(gCrop), WS_GetCropHarvests(gCrop));
+		DemoMsg(playerid, COLOR_BLUE, line);
+	}
+	return 1;
+}
+
+public OnPlayerCommandText(playerid, cmdtext[])
+{
+	if (!strcmp(cmdtext, "/wshelp", true) || !strcmp(cmdtext, "/comandos", true))
+	{
+		return DemoShowHelp(playerid);
+	}
+
+	if (!strcmp(cmdtext, "/wsdemo", true))
+	{
+		DemoTeleport(playerid);
+		DemoMsg(playerid, COLOR_GREEN, "Teletransportado a la zona WorldSync.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsstats", true))
+	{
+		return DemoPrintStats(playerid);
+	}
+
+	if (!strcmp(cmdtext, "/wsdoor", true))
+	{
+		if (!gDoor || !WS_EntityExists(gDoor))
+		{
+			DemoMsg(playerid, COLOR_RED, "La puerta no existe.");
+			return 1;
+		}
+		if (WS_IsDoorLocked(gDoor))
+		{
+			DemoMsg(playerid, COLOR_RED, "La puerta esta bloqueada. Usa /wslock.");
+			return 1;
+		}
+		new bool:open = !WS_IsDoorOpen(gDoor);
+		WS_SetDoorOpen(gDoor, open);
+		DemoMsg(playerid, COLOR_GREEN, open ? "Puerta abierta y estado persistido." : "Puerta cerrada y estado persistido.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wslock", true))
+	{
+		if (!gDoor || !WS_EntityExists(gDoor))
+		{
+			DemoMsg(playerid, COLOR_RED, "La puerta no existe.");
+			return 1;
+		}
+		new bool:locked = !WS_IsDoorLocked(gDoor);
+		WS_SetDoorLocked(gDoor, locked);
+		DemoMsg(playerid, COLOR_YELLOW, locked ? "Puerta bloqueada." : "Puerta desbloqueada.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wscar", true))
+	{
+		new runtime = WS_GetVehicleID(gCar);
+		if (!runtime)
+		{
+			DemoMsg(playerid, COLOR_RED, "Vehiculo runtime no disponible.");
+			return 1;
+		}
+		PutPlayerInVehicle(playerid, runtime, 0);
+		DemoMsg(playerid, COLOR_GREEN, "Subiste al vehiculo persistente.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsrepair", true))
+	{
+		WS_RepairVehicle(gCar);
+		WS_SetVehicleColours(gCar, random(126), random(126));
+		DemoMsg(playerid, COLOR_GREEN, "Vehiculo reparado y colores guardados.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wscrop", true))
+	{
+		new line[128], species[24];
+		WS_GetCropSpecies(gCrop, species);
+		format(line, sizeof(line), "Crop %d species=%s growth=%d ready=%d harvests=%d",
+			gCrop, species, WS_GetCropGrowth(gCrop), WS_IsCropReady(gCrop), WS_GetCropHarvests(gCrop));
+		DemoMsg(playerid, COLOR_BLUE, line);
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsgrow", true))
+	{
+		new growth = WS_GetCropGrowth(gCrop) + 25;
+		if (growth > 100)
+		{
+			growth = 100;
+		}
+		WS_SetCropGrowth(gCrop, growth);
+		DemoMsg(playerid, COLOR_GREEN, "Crecimiento del cultivo aumentado.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsharvest", true))
+	{
+		if (!WS_IsCropReady(gCrop))
+		{
+			DemoMsg(playerid, COLOR_RED, "El cultivo todavia no esta listo. Usa /wsgrow o espera.");
+			return 1;
+		}
+		WS_HarvestCrop(gCrop);
+		DemoMsg(playerid, COLOR_GREEN, "Cultivo cosechado. WorldSync actualizo harvests/growth.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsnear", true))
+	{
+		new Float:x, Float:y, Float:z;
+		new ids[16], type[24], line[144];
+		GetPlayerPos(playerid, x, y, z);
+		new nearest = WS_GetNearestEntity(x, y, z, DEMO_WORLD, DEMO_INT, 80.0, "");
+		new count = WS_GetEntitiesInRange(x, y, z, ids, sizeof(ids), DEMO_WORLD, DEMO_INT, 80.0, "");
+		WS_GetEntityType(nearest, type);
+		format(line, sizeof(line), "Cerca tuyo: %d entidades. Nearest=%d type=%s", count, nearest, type);
+		DemoMsg(playerid, COLOR_BLUE, line);
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wspath", true))
+	{
+		WS_SetPathDebug(true);
+		WS_DebugPathRoute(gRoute);
+		DemoMsg(playerid, COLOR_GREEN, "Debug de path activo. Mira labels/ruta; /wsdebug lo apaga.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsdebug", true))
+	{
+		WS_SetPathDebug(false);
+		WS_ClearPathDebug();
+		DemoMsg(playerid, COLOR_YELLOW, "Debug visual de paths desactivado.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wssave", true))
+	{
+		new changed = WS_Save(false);
+		new line[80];
+		format(line, sizeof(line), "Guardado completo: %d cambios.", changed);
+		DemoMsg(playerid, COLOR_GREEN, line);
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsentity", true))
+	{
+		new Float:x, Float:y, Float:z, line[128];
+		GetPlayerPos(playerid, x, y, z);
+		new entity = WS_CreateEntity("marker", x, y, z, DEMO_WORLD, DEMO_INT);
+		WS_SetState(entity, "demo", "player_marker");
+		WS_SetStateInt(entity, "owner", playerid);
+		WS_SetSimulated(entity, true);
+		format(line, sizeof(line), "Entidad generica creada: id=%d type=marker simulated=1", entity);
+		DemoMsg(playerid, COLOR_GREEN, line);
+		return 1;
+	}
+
+	return 0;
+}
+
+public OnDoorStateChange(doorid, bool:isOpen)
+{
+	new line[96];
+	format(line, sizeof(line), "[WorldSync] Door %d open=%d", doorid, isOpen);
+	DemoMsgAll(COLOR_YELLOW, line);
+	return 1;
+}
+
+public OnWorldSyncEntityCreated(entityid, const type[])
+{
+	printf("[Derby/WorldSync] Entity created id=%d type=%s", entityid, type);
+	return 1;
+}
+
+public OnWorldSyncEntityDestroyed(entityid, const type[])
+{
+	printf("[Derby/WorldSync] Entity destroyed id=%d type=%s", entityid, type);
+	return 1;
+}
+
+public OnWorldSyncEntityStateChange(entityid, const key[], const oldValue[], const newValue[])
+{
+	if (!strcmp(key, "growth") && strcmp(newValue, "100"))
+	{
+		return 1;
+	}
+
+	if (!strcmp(key, "open") || !strcmp(key, "locked") || !strcmp(key, "growth") || !strcmp(key, "harvests"))
+	{
+		printf("[Derby/WorldSync] State entity=%d %s: %s -> %s", entityid, key, oldValue, newValue);
+	}
+	return 1;
+}
+
+public OnWorldSyncLoaded(entityCount, bool:storageAvailable)
+{
+	printf("[Derby/WorldSync] Loaded entities=%d storage=%d", entityCount, storageAvailable);
+	return 1;
+}
+
+public OnWorldSyncSaved(entityCount, changedCount, bool:dirtyOnly)
+{
+	printf("[Derby/WorldSync] Saved entities=%d changed=%d dirtyOnly=%d", entityCount, changedCount, dirtyOnly);
+	return 1;
+}
+
+public OnWorldSyncCropReady(cropid)
+{
+	new line[96];
+	format(line, sizeof(line), "[WorldSync] Crop %d listo para cosechar. Usa /wsharvest.", cropid);
+	DemoMsgAll(COLOR_GREEN, line);
+	return 1;
+}
