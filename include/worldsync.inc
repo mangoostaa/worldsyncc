@@ -94,6 +94,8 @@ native WS_GetPathPoint(pathid, index, &Float:x, &Float:y, &Float:z);
 native WS_CreateNPCPath(pathid, Float:stopRange = 1.0);
 native WS_MoveNPCByPath(npcid, pathid, moveType = WS_NPC_MOVE_AUTO, Float:speed = -1.0, bool:reverse = false);
 native WS_NPCGoTo(npcid, Float:x, Float:y, Float:z, virtualworld = -1, interior = -1, Float:nodeSearchRadius = 80.0, moveType = WS_NPC_MOVE_AUTO, Float:speed = -1.0);
+native WS_GetNearestNPC(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0);
+native WS_GetNPCsInRange(Float:x, Float:y, Float:z, npcids[], maxNPCs = sizeof(npcids), virtualworld = 0, interior = 0, Float:radius = 50.0);
 native WS_SetPathDebug(bool:enabled);
 native WS_DebugPathRoute(pathid);
 native WS_ClearPathDebug();

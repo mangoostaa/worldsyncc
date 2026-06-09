@@ -121,6 +121,8 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 | `WS_CreateNPCPath(pathid, Float:stopRange = 1.0)` | Converts a route to an NPC component path. | Route ID and stop range. | `new np = WS_CreateNPCPath(route);` |
 | `WS_MoveNPCByPath(npcid, pathid, moveType = WS_NPC_MOVE_AUTO, Float:speed = -1.0, bool:reverse = false)` | Moves an NPC along a WorldSync route. | NPC ID, route ID, movement options. | `WS_MoveNPCByPath(npcid, route, WS_NPC_MOVE_WALK);` |
 | `WS_NPCGoTo(npcid, Float:x, Float:y, Float:z, virtualworld = -1, interior = -1, Float:nodeSearchRadius = 80.0, moveType = WS_NPC_MOVE_AUTO, Float:speed = -1.0)` | Finds nearest start/end nodes, creates route and starts movement. | NPC, destination, optional scope/radius/move settings. | `WS_NPCGoTo(npcid, x, y, z);` |
+| `WS_GetNearestNPC(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0)` | Uses the runtime NPC spatial grid to find the closest NPC. | Position, scope and max distance. | `new npc = WS_GetNearestNPC(x, y, z, 0, 0, 30.0);` |
+| `WS_GetNPCsInRange(Float:x, Float:y, Float:z, npcids[], maxNPCs = sizeof(npcids), virtualworld = 0, interior = 0, Float:radius = 50.0)` | Fills `npcids` with nearby NPC IDs from the runtime NPC spatial grid. | Output array, max output count, scope and radius. | `new ids[8]; new n = WS_GetNPCsInRange(x, y, z, ids, sizeof(ids));` |
 | `WS_SetPathDebug(bool:enabled)` | Shows or hides debug labels for path graph. | `enabled`: true/false. | `WS_SetPathDebug(true);` |
 | `WS_DebugPathRoute(pathid)` | Shows debug labels for one route. | `pathid`: route ID. | `WS_DebugPathRoute(route);` |
 | `WS_ClearPathDebug()` | Removes path debug labels. | None. | `WS_ClearPathDebug();` |

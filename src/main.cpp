@@ -532,6 +532,10 @@ public:
 		{
 			cropModule_->tickCrops(delta);
 		}
+		if (pathModule_)
+		{
+			pathModule_->tickNPCSpatialGrid(delta);
+		}
 	}
 
 	void onAmxLoad(IPawnScript& script) override

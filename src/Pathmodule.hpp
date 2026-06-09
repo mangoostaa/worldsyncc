@@ -6,6 +6,7 @@
 #include <Server/Components/Pawn/pawn.hpp>
 #include <Server/Components/TextLabels/textlabels.hpp>
 #include <sdk.hpp>
+#include <chrono>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -37,6 +38,14 @@ struct Patrol
 	bool active = false;
 	NPCMoveType moveType = NPCMoveType_Auto;
 	float speed = NPC_MOVE_SPEED_AUTO;
+};
+
+struct NPCSpatialEntry
+{
+	int id = 0;
+	Vec3 position;
+	int world = 0;
+	int interior = 0;
 };
 
 class PathModule : public NPCEventHandler
@@ -74,6 +83,9 @@ public:
 	int createNPCPath(int routeID, float stopRange);
 	bool moveNPCByRoute(int npcID, int routeID, NPCMoveType moveType, float speed, bool reverse);
 	int npcGoTo(int npcID, Vec3 destination, int virtualWorld, int interior, float nodeSearchRadius, NPCMoveType moveType, float speed);
+	void tickNPCSpatialGrid(std::chrono::milliseconds elapsed);
+	int findNearestNPC(Vec3 position, int virtualWorld, int interior, float maxDistance);
+	std::vector<int> findNPCsInRange(Vec3 position, int virtualWorld, int interior, float radius, size_t maxResults);
 
 	int createPatrol(int npcID, int routeID, bool loop, NPCMoveType moveType, float speed);
 	bool startPatrol(int patrolID);
@@ -91,6 +103,8 @@ public:
 
 	void onNPCFinishMovePathPoint(INPC& npc, int pathId, int pointId) override;
 	void onNPCFinishMovePath(INPC& npc, int pathId) override;
+	void onNPCCreate(INPC& npc) override;
+	void onNPCDestroy(INPC& npc) override;
 
 	void registerNatives(IPawnScript& script);
 	IPawnComponent* pawnRef() const { return pawn_; }
@@ -104,6 +118,7 @@ private:
 	void invalidateRouteCache();
 	std::string routeCacheKey(int startNode, int endNode) const;
 	int storeRoute(std::vector<int> nodes);
+	void rebuildNPCSpatialGrid();
 
 	std::vector<PathEdge> getEdges(int nodeID) const;
 	void setEdges(int nodeID, const std::vector<PathEdge>& edges);
@@ -115,6 +130,26 @@ private:
 	Vector3 toVector3(Vec3 value) const;
 	bool createDebugLabel(const std::string& text, Vec3 position, Colour colour, int world);
 
+	struct NPCSpatialCell
+	{
+		int world = 0;
+		int interior = 0;
+		int x = 0;
+		int y = 0;
+
+		bool operator==(const NPCSpatialCell& other) const
+		{
+			return world == other.world && interior == other.interior && x == other.x && y == other.y;
+		}
+	};
+
+	struct NPCSpatialCellHash
+	{
+		size_t operator()(const NPCSpatialCell& cell) const;
+	};
+
+	NPCSpatialCell npcSpatialCellFor(Vec3 position, int world, int interior) const;
+
 	WorldSyncCore& core_;
 	IPawnComponent* pawn_;
 	INPCComponent* npcs_;
@@ -125,7 +160,11 @@ private:
 	std::unordered_map<int, Route> routes_;
 	std::unordered_map<std::string, std::vector<int>> routeCache_;
 	std::unordered_map<int, Patrol> patrols_;
+	std::unordered_map<NPCSpatialCell, std::vector<int>, NPCSpatialCellHash> npcSpatialGrid_;
+	std::unordered_map<int, NPCSpatialEntry> npcSpatialEntries_;
 	std::vector<int> debugLabelIDs_;
+	std::chrono::milliseconds npcSpatialElapsed_ { 0 };
 	bool pathDebugEnabled_ = false;
+	bool npcSpatialDirty_ = true;
 };
 } // namespace worlds

@@ -12,6 +12,9 @@ namespace worlds
 {
 namespace
 {
+constexpr float NPCSpatialCellSize = 50.0f;
+constexpr std::chrono::milliseconds NPCSpatialUpdateInterval { 250 };
+
 bool setPawnCell(AMX* amx, IPawnComponent* pawn, cell address, cell value)
 {
 	if (!pawn) return false;
@@ -328,6 +331,140 @@ int PathModule::npcGoTo(int npcID, Vec3 destination, int virtualWorld, int inter
 	return routeID;
 }
 
+void PathModule::tickNPCSpatialGrid(std::chrono::milliseconds elapsed)
+{
+	if (!npcs_)
+	{
+		npcSpatialGrid_.clear();
+		npcSpatialEntries_.clear();
+		npcSpatialDirty_ = true;
+		npcSpatialElapsed_ = std::chrono::milliseconds { 0 };
+		return;
+	}
+
+	npcSpatialElapsed_ += elapsed;
+	if (!npcSpatialDirty_ && npcSpatialElapsed_ < NPCSpatialUpdateInterval)
+	{
+		return;
+	}
+
+	rebuildNPCSpatialGrid();
+	npcSpatialElapsed_ = std::chrono::milliseconds { 0 };
+	npcSpatialDirty_ = false;
+}
+
+int PathModule::findNearestNPC(Vec3 position, int virtualWorld, int interior, float maxDistance)
+{
+	if (!npcs_)
+	{
+		return 0;
+	}
+
+	if (npcSpatialDirty_ || npcSpatialEntries_.empty())
+	{
+		rebuildNPCSpatialGrid();
+		npcSpatialDirty_ = false;
+		npcSpatialElapsed_ = std::chrono::milliseconds { 0 };
+	}
+
+	int bestNPC = 0;
+	float bestDistanceSq = maxDistance <= 0.0f ? std::numeric_limits<float>::max() : maxDistance * maxDistance;
+
+	auto testNPC = [&](const NPCSpatialEntry& entry) {
+		if (entry.world != virtualWorld || entry.interior != interior)
+		{
+			return;
+		}
+
+		const float dx = entry.position.x - position.x;
+		const float dy = entry.position.y - position.y;
+		const float dz = entry.position.z - position.z;
+		const float current = dx * dx + dy * dy + dz * dz;
+		if (current <= bestDistanceSq)
+		{
+			bestDistanceSq = current;
+			bestNPC = entry.id;
+		}
+	};
+
+	if (maxDistance <= 0.0f)
+	{
+		for (const auto& item : npcSpatialEntries_)
+		{
+			testNPC(item.second);
+		}
+		return bestNPC;
+	}
+
+	const std::vector<int> candidates = findNPCsInRange(position, virtualWorld, interior, maxDistance, 0);
+	for (int npcID : candidates)
+	{
+		const auto it = npcSpatialEntries_.find(npcID);
+		if (it != npcSpatialEntries_.end())
+		{
+			testNPC(it->second);
+		}
+	}
+
+	return bestNPC;
+}
+
+std::vector<int> PathModule::findNPCsInRange(Vec3 position, int virtualWorld, int interior, float radius, size_t maxResults)
+{
+	std::vector<int> result;
+	if (!npcs_ || radius < 0.0f)
+	{
+		return result;
+	}
+
+	if (npcSpatialDirty_ || npcSpatialEntries_.empty())
+	{
+		rebuildNPCSpatialGrid();
+		npcSpatialDirty_ = false;
+		npcSpatialElapsed_ = std::chrono::milliseconds { 0 };
+	}
+
+	const float radiusSq = radius * radius;
+	const int cellRadius = static_cast<int>(std::ceil(radius / NPCSpatialCellSize));
+	const NPCSpatialCell center = npcSpatialCellFor(position, virtualWorld, interior);
+
+	for (int cy = center.y - cellRadius; cy <= center.y + cellRadius; ++cy)
+	{
+		for (int cx = center.x - cellRadius; cx <= center.x + cellRadius; ++cx)
+		{
+			const auto cellIt = npcSpatialGrid_.find(NPCSpatialCell { virtualWorld, interior, cx, cy });
+			if (cellIt == npcSpatialGrid_.end())
+			{
+				continue;
+			}
+
+			for (int npcID : cellIt->second)
+			{
+				const auto entryIt = npcSpatialEntries_.find(npcID);
+				if (entryIt == npcSpatialEntries_.end())
+				{
+					continue;
+				}
+
+				const NPCSpatialEntry& entry = entryIt->second;
+				const float dx = entry.position.x - position.x;
+				const float dy = entry.position.y - position.y;
+				const float dz = entry.position.z - position.z;
+				if ((dx * dx + dy * dy + dz * dz) <= radiusSq)
+				{
+					result.push_back(npcID);
+					if (maxResults > 0 && result.size() >= maxResults)
+					{
+						return result;
+					}
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
 int PathModule::createPatrol(int npcID, int routeID, bool loop, NPCMoveType moveType, float speed)
 {
 	if (!npcs_ || routes_.find(routeID) == routes_.end() || !npcs_->get(npcID))
@@ -588,6 +725,17 @@ void PathModule::onNPCFinishMovePath(INPC& npc, int pathId)
 	}
 }
 
+void PathModule::onNPCCreate(INPC&)
+{
+	npcSpatialDirty_ = true;
+}
+
+void PathModule::onNPCDestroy(INPC& npc)
+{
+	npcSpatialEntries_.erase(npc.getID());
+	npcSpatialDirty_ = true;
+}
+
 std::vector<PathEdge> PathModule::getEdges(int nodeID) const
 {
 	std::string encoded;
@@ -810,6 +958,52 @@ int PathModule::storeRoute(std::vector<int> nodes)
 	return routeID;
 }
 
+void PathModule::rebuildNPCSpatialGrid()
+{
+	npcSpatialGrid_.clear();
+	npcSpatialEntries_.clear();
+	if (!npcs_)
+	{
+		return;
+	}
+
+	for (INPC* npc : *npcs_)
+	{
+		if (!npc)
+		{
+			continue;
+		}
+
+		const Vector3 position = npc->getPosition();
+		NPCSpatialEntry entry;
+		entry.id = npc->getID();
+		entry.position = Vec3 { position.x, position.y, position.z };
+		entry.world = npc->getVirtualWorld();
+		entry.interior = static_cast<int>(npc->getInterior());
+		npcSpatialGrid_[npcSpatialCellFor(entry.position, entry.world, entry.interior)].push_back(entry.id);
+		npcSpatialEntries_[entry.id] = entry;
+	}
+}
+
+size_t PathModule::NPCSpatialCellHash::operator()(const NPCSpatialCell& cell) const
+{
+	size_t seed = static_cast<size_t>(cell.world);
+	seed ^= static_cast<size_t>(cell.interior) + 0x9e3779b9u + (seed << 6) + (seed >> 2);
+	seed ^= static_cast<size_t>(cell.x) + 0x9e3779b9u + (seed << 6) + (seed >> 2);
+	seed ^= static_cast<size_t>(cell.y) + 0x9e3779b9u + (seed << 6) + (seed >> 2);
+	return seed;
+}
+
+PathModule::NPCSpatialCell PathModule::npcSpatialCellFor(Vec3 position, int world, int interior) const
+{
+	return NPCSpatialCell {
+		world,
+		interior,
+		static_cast<int>(std::floor(position.x / NPCSpatialCellSize)),
+		static_cast<int>(std::floor(position.y / NPCSpatialCellSize))
+	};
+}
+
 static PathModule* s_pathModule = nullptr;
 
 static cell AMX_NATIVE_CALL n_WS_CreatePathNode(AMX*, cell* params)
@@ -919,6 +1113,42 @@ static cell AMX_NATIVE_CALL n_WS_NPCGoTo(AMX*, cell* params)
 		amx_ctof(params[9]));
 }
 
+static cell AMX_NATIVE_CALL n_WS_GetNearestNPC(AMX*, cell* params)
+{
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 6) return 0;
+	const Vec3 position { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
+	return s_pathModule->findNearestNPC(position, static_cast<int>(params[4]), static_cast<int>(params[5]), amx_ctof(params[6]));
+}
+
+static cell AMX_NATIVE_CALL n_WS_GetNPCsInRange(AMX* amx, cell* params)
+{
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 8 || params[5] <= 0) return 0;
+
+	const Vec3 position { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
+	const int maxNPCs = static_cast<int>(params[5]);
+	const std::vector<int> npcs = s_pathModule->findNPCsInRange(
+		position,
+		static_cast<int>(params[6]),
+		static_cast<int>(params[7]),
+		amx_ctof(params[8]),
+		static_cast<size_t>(maxNPCs));
+
+	int written = 0;
+	for (int npcID : npcs)
+	{
+		if (written >= maxNPCs)
+		{
+			break;
+		}
+		if (!setPawnCell(amx, s_pathModule->pawnRef(), params[4] + written, static_cast<cell>(npcID)))
+		{
+			break;
+		}
+		++written;
+	}
+	return written;
+}
+
 static cell AMX_NATIVE_CALL n_WS_SetPathDebug(AMX*, cell* params)
 {
 	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
@@ -1012,6 +1242,8 @@ static const AMX_NATIVE_INFO PathNatives[] = {
 	{ "WS_CreateNPCPath", n_WS_CreateNPCPath },
 	{ "WS_MoveNPCByPath", n_WS_MoveNPCByPath },
 	{ "WS_NPCGoTo", n_WS_NPCGoTo },
+	{ "WS_GetNearestNPC", n_WS_GetNearestNPC },
+	{ "WS_GetNPCsInRange", n_WS_GetNPCsInRange },
 	{ "WS_SetPathDebug", n_WS_SetPathDebug },
 	{ "WS_DebugPathRoute", n_WS_DebugPathRoute },
 	{ "WS_ClearPathDebug", n_WS_ClearPathDebug },
