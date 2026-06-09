@@ -1,3 +1,7 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "Pathmodule.hpp"
 
 #include <algorithm>
