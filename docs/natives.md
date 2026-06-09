@@ -117,6 +117,9 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 | Native | Description | Parameters | Example |
 | --- | --- | --- | --- |
 | `WS_CreatePathNode(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0)` | Creates a persistent path node. | Position and scope. | `new a = WS_CreatePathNode(x, y, z);` |
+| `WS_CreatePathObstacle(Float:x, Float:y, Float:z, Float:width, Float:depth, Float:margin = 1.0, virtualworld = 0, interior = 0)` | Creates a persistent 2D navigation blocker used by path edges. | Center, box size, safety margin and scope. | `new wall = WS_CreatePathObstacle(x, y, z, 10.0, 4.0);` |
+| `WS_DestroyPathObstacle(obstacleid)` | Removes a navigation obstacle and clears route cache. | Obstacle entity ID. | `WS_DestroyPathObstacle(wall);` |
+| `bool:WS_IsPathBlocked(Float:fromX, Float:fromY, Float:fromZ, Float:toX, Float:toY, Float:toZ, virtualworld = 0, interior = 0)` | Checks if a straight segment crosses any path obstacle in that scope. | Segment endpoints and scope. | `if (WS_IsPathBlocked(ax, ay, az, bx, by, bz)) { }` |
 | `WS_ConnectPathNodes(fromNode, toNode, bool:bidirectional = true, Float:cost = 0.0)` | Connects two nodes. Cost defaults to distance. | Node IDs, direction flag, optional cost. | `WS_ConnectPathNodes(a, b);` |
 | `WS_DisconnectPathNodes(fromNode, toNode, bool:bidirectional = true)` | Removes an edge. | Node IDs, direction flag. | `WS_DisconnectPathNodes(a, b);` |
 | `WS_GetNearestPathNode(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0)` | Finds the closest path node using the spatial grid. | Position, scope, radius. | `new n = WS_GetNearestPathNode(x, y, z);` |

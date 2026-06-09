@@ -90,6 +90,9 @@ native WS_GetCropHarvests(cropid);
 native WS_GetCropSpecies(cropid, species[], size = sizeof(species));
 
 native WS_CreatePathNode(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0);
+native WS_CreatePathObstacle(Float:x, Float:y, Float:z, Float:width, Float:depth, Float:margin = 1.0, virtualworld = 0, interior = 0);
+native WS_DestroyPathObstacle(obstacleid);
+native bool:WS_IsPathBlocked(Float:fromX, Float:fromY, Float:fromZ, Float:toX, Float:toY, Float:toZ, virtualworld = 0, interior = 0);
 native WS_ConnectPathNodes(fromNode, toNode, bool:bidirectional = true, Float:cost = 0.0);
 native WS_DisconnectPathNodes(fromNode, toNode, bool:bidirectional = true);
 native WS_GetNearestPathNode(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0);

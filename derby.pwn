@@ -19,6 +19,7 @@ new gPathA;
 new gPathB;
 new gPathC;
 new gPathD;
+new gObstacle;
 new gCropPickup = -1;
 new gGuardNpc = INVALID_NPC_ID;
 new gGuardPatrol;
@@ -205,41 +206,86 @@ stock DemoSetupCrop()
 
 stock DemoSetupPath()
 {
+	new Float:ax = 1502.0, Float:ay = -1677.0, Float:az = 13.5;
+	new Float:bx = 1502.0, Float:by = -1704.0, Float:bz = 13.5;
+	new Float:cx = 1544.0, Float:cy = -1704.0, Float:cz = 13.5;
+	new Float:dx = 1544.0, Float:dy = -1677.0, Float:dz = 13.5;
+	new Float:ox = 1523.0, Float:oy = -1677.0, Float:oz = 13.5;
+
 	gPathA = DemoKeepOneByState("path_node", "a");
 	gPathB = DemoKeepOneByState("path_node", "b");
 	gPathC = DemoKeepOneByState("path_node", "c");
 	gPathD = DemoKeepOneByState("path_node", "d");
+	gObstacle = DemoKeepOneByState("path_obstacle", "nav_wall");
 
 	if (!gPathA)
 	{
-		gPathA = WS_CreatePathNode(1508.0, -1692.0, 13.5, DEMO_WORLD, DEMO_INT);
+		gPathA = WS_CreatePathNode(ax, ay, az, DEMO_WORLD, DEMO_INT);
 		WS_SetState(gPathA, "demo", "a");
 	}
 	if (!gPathB)
 	{
-		gPathB = WS_CreatePathNode(1538.0, -1692.0, 13.5, DEMO_WORLD, DEMO_INT);
+		gPathB = WS_CreatePathNode(bx, by, bz, DEMO_WORLD, DEMO_INT);
 		WS_SetState(gPathB, "demo", "b");
 	}
 	if (!gPathC)
 	{
-		gPathC = WS_CreatePathNode(1538.0, -1662.0, 13.5, DEMO_WORLD, DEMO_INT);
+		gPathC = WS_CreatePathNode(cx, cy, cz, DEMO_WORLD, DEMO_INT);
 		WS_SetState(gPathC, "demo", "c");
 	}
 	if (!gPathD)
 	{
-		gPathD = WS_CreatePathNode(1508.0, -1662.0, 13.5, DEMO_WORLD, DEMO_INT);
+		gPathD = WS_CreatePathNode(dx, dy, dz, DEMO_WORLD, DEMO_INT);
 		WS_SetState(gPathD, "demo", "d");
 	}
+	if (!gObstacle)
+	{
+		gObstacle = WS_CreatePathObstacle(ox, oy, oz, 24.0, 18.0, 2.0, DEMO_WORLD, DEMO_INT);
+		WS_SetState(gObstacle, "demo", "nav_wall");
+		WS_SetState(gObstacle, "name", "Navigation wall");
+	}
+	else
+	{
+		WS_SetEntityPos(gObstacle, ox, oy, oz);
+		WS_SetStateFloat(gObstacle, "width", 24.0);
+		WS_SetStateFloat(gObstacle, "depth", 18.0);
+		WS_SetStateFloat(gObstacle, "margin", 2.0);
+	}
+
+	WS_SetEntityPos(gPathA, ax, ay, az);
+	WS_SetEntityPos(gPathB, bx, by, bz);
+	WS_SetEntityPos(gPathC, cx, cy, cz);
+	WS_SetEntityPos(gPathD, dx, dy, dz);
+	WS_DisconnectPathNodes(gPathA, gPathB, true);
+	WS_DisconnectPathNodes(gPathB, gPathC, true);
+	WS_DisconnectPathNodes(gPathC, gPathD, true);
+	WS_DisconnectPathNodes(gPathD, gPathA, true);
+	WS_DisconnectPathNodes(gPathA, gPathC, true);
+	WS_DisconnectPathNodes(gPathA, gPathD, true);
 
 	WS_ConnectPathNodes(gPathA, gPathB, true, 0.0);
 	WS_ConnectPathNodes(gPathB, gPathC, true, 0.0);
 	WS_ConnectPathNodes(gPathC, gPathD, true, 0.0);
-	WS_ConnectPathNodes(gPathD, gPathA, true, 0.0);
+	new directBlocked = WS_IsPathBlocked(ax, ay, az, dx, dy, dz, DEMO_WORLD, DEMO_INT) ? 1 : 0;
+	new directConnected = WS_ConnectPathNodes(gPathA, gPathD, true, 0.0);
 	WS_ClearPathCache();
-	gRoute = WS_FindPath(gPathA, gPathC);
+	gRoute = WS_FindPath(gPathA, gPathD);
 
-	DemoCreateLabel("WorldSync Path\n/wspath muestra ruta\n/wsnearest busca nodo", 1508.0, -1692.0, 15.0);
-	printf("[Derby/WorldSync] Path route=%d length=%d cache=%d", gRoute, WS_GetPathLength(gRoute), WS_GetPathCacheSize());
+	CreateObject(19353, 1517.0, -1677.0, 14.2, 0.0, 0.0, 90.0, 300.0);
+	CreateObject(19353, 1523.0, -1677.0, 14.2, 0.0, 0.0, 90.0, 300.0);
+	CreateObject(19353, 1529.0, -1677.0, 14.2, 0.0, 0.0, 90.0, 300.0);
+	DemoCreateLabel("A inicio\nNPC debe bajar", ax, ay, 15.0);
+	DemoCreateLabel("B rodeo", bx, by, 15.0);
+	DemoCreateLabel("C rodeo", cx, cy, 15.0);
+	DemoCreateLabel("D destino", dx, dy, 15.0);
+	DemoCreateLabel("Path obstacle\nbloquea A->D directo", ox, oy, 16.0);
+	printf("[Derby/WorldSync] Path route=%d length=%d cache=%d obstacle=%d directBlocked=%d directConnected=%d",
+		gRoute,
+		WS_GetPathLength(gRoute),
+		WS_GetPathCacheSize(),
+		gObstacle,
+		directBlocked,
+		directConnected);
 	return gRoute;
 }
 
@@ -259,14 +305,14 @@ stock DemoSetupNPC()
 	}
 
 	NPC_SetSkin(gGuardNpc, 280);
-	NPC_SetPos(gGuardNpc, 1508.0, -1692.0, 13.5);
+	NPC_SetPos(gGuardNpc, 1502.0, -1677.0, 13.5);
 	NPC_SetVirtualWorld(gGuardNpc, DEMO_WORLD);
 	NPC_SetInterior(gGuardNpc, DEMO_INT);
 	NPC_SetFacingAngle(gGuardNpc, 90.0);
 	NPC_SetInvulnerable(gGuardNpc, true);
 	NPC_Spawn(gGuardNpc);
 
-	DemoCreateLabel("WorldSync NPC\n/wsnpc patrol\n/wsnpcgo destino\n/wsnpcstop stop", 1508.0, -1692.0, 16.0);
+	DemoCreateLabel("WorldSync NPC\n/wsnpc patrol\n/wsnpcgo destino\n/wsnpcstop stop", 1502.0, -1677.0, 16.0);
 	printf("[Derby/WorldSync] NPC guard created npcid=%d route=%d", gGuardNpc, gRoute);
 	return gGuardNpc;
 }
@@ -292,7 +338,7 @@ stock DemoStartNPCPatrolCore()
 		gGuardPatrol = 0;
 	}
 
-	NPC_SetPos(gGuardNpc, 1508.0, -1692.0, 13.5);
+	NPC_SetPos(gGuardNpc, 1502.0, -1677.0, 13.5);
 	NPC_SetVirtualWorld(gGuardNpc, DEMO_WORLD);
 	NPC_SetInterior(gGuardNpc, DEMO_INT);
 	gGuardPatrol = WS_CreatePatrol(gGuardNpc, gRoute, true, WS_NPC_MOVE_WALK, -1.0);
@@ -565,8 +611,15 @@ public OnPlayerCommandText(playerid, cmdtext[])
 
 	if (!strcmp(cmdtext, "/wspath", true))
 	{
+		new line[128];
 		WS_SetPathDebug(true);
 		WS_DebugPathRoute(gRoute);
+		format(line, sizeof(line), "Ruta=%d len=%d obstaculo=%d A-D bloqueado=%d",
+			gRoute,
+			WS_GetPathLength(gRoute),
+			gObstacle,
+			WS_IsPathBlocked(1502.0, -1677.0, 13.5, 1544.0, -1677.0, 13.5, DEMO_WORLD, DEMO_INT) ? 1 : 0);
+		DemoMsg(playerid, COLOR_GREEN, line);
 		DemoMsg(playerid, COLOR_GREEN, "Debug de path activo. Mira labels/ruta; /wsdebug lo apaga.");
 		return 1;
 	}
@@ -599,8 +652,8 @@ public OnPlayerCommandText(playerid, cmdtext[])
 			DemoMsg(playerid, COLOR_RED, "NPC no disponible.");
 			return 1;
 		}
-		WS_NPCGoTo(gGuardNpc, 1538.0, -1662.0, 13.5, DEMO_WORLD, DEMO_INT, 80.0, WS_NPC_MOVE_JOG, 0.65);
-		DemoMsg(playerid, COLOR_GREEN, "NPC enviado al nodo C con WS_NPCGoTo.");
+		WS_NPCGoTo(gGuardNpc, 1544.0, -1677.0, 13.5, DEMO_WORLD, DEMO_INT, 80.0, WS_NPC_MOVE_JOG, 0.65);
+		DemoMsg(playerid, COLOR_GREEN, "NPC enviado al nodo D con WS_NPCGoTo.");
 		return 1;
 	}
 

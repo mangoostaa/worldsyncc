@@ -332,6 +332,36 @@ void testPathModuleAStar()
 	assert(paths.disconnectNodes(b, c, true));
 	assert(paths.routeCacheSize() == 0);
 }
+
+void testPathModuleObstacleAvoidance()
+{
+	cleanStorage();
+
+	worlds::WorldSyncCore core;
+	worlds::PathModule paths(core, nullptr, nullptr, nullptr, nullptr);
+
+	const int a = paths.createNode(worlds::Vec3 { 0.0f, 0.0f, 0.0f });
+	const int b = paths.createNode(worlds::Vec3 { 0.0f, 10.0f, 0.0f });
+	const int c = paths.createNode(worlds::Vec3 { 20.0f, 10.0f, 0.0f });
+	const int d = paths.createNode(worlds::Vec3 { 20.0f, 0.0f, 0.0f });
+	const int obstacle = paths.createObstacle(worlds::Vec3 { 10.0f, 0.0f, 0.0f }, 6.0f, 6.0f, 0.0f);
+
+	assert(obstacle != 0);
+	assert(paths.isObstacle(obstacle));
+	assert(paths.isSegmentBlocked(worlds::Vec3 { 0.0f, 0.0f, 0.0f }, worlds::Vec3 { 20.0f, 0.0f, 0.0f }, 0, 0));
+	assert(!paths.connectNodes(a, d, true));
+	assert(paths.connectNodes(a, b, true));
+	assert(paths.connectNodes(b, c, true));
+	assert(paths.connectNodes(c, d, true));
+
+	const int route = paths.findPath(a, d);
+	assert(route != 0);
+	assert(paths.routeLength(route) == 4);
+	assert(paths.routeNode(route, 0) == a);
+	assert(paths.routeNode(route, 1) == b);
+	assert(paths.routeNode(route, 2) == c);
+	assert(paths.routeNode(route, 3) == d);
+}
 } // namespace
 
 int main()
@@ -343,6 +373,7 @@ int main()
 	testCropModuleGrowthAndHarvest();
 	testVehicleModulePersistenceFallback();
 	testPathModuleAStar();
+	testPathModuleObstacleAvoidance();
 
 	std::cout << "WorldSync unit tests passed\n";
 	return 0;

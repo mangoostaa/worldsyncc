@@ -14,7 +14,11 @@
 namespace worlds
 {
 constexpr const char* PATH_NODE_TYPE = "path_node";
+constexpr const char* PATH_OBSTACLE_TYPE = "path_obstacle";
 constexpr const char* PATH_KEY_EDGES = "edges";
+constexpr const char* PATH_OBSTACLE_WIDTH = "width";
+constexpr const char* PATH_OBSTACLE_DEPTH = "depth";
+constexpr const char* PATH_OBSTACLE_MARGIN = "margin";
 
 struct PathEdge
 {
@@ -68,6 +72,10 @@ public:
 
 	int createNode(Vec3 position, int virtualWorld = 0, int interior = 0);
 	bool isNode(int nodeID) const;
+	int createObstacle(Vec3 position, float width, float depth, float margin, int virtualWorld = 0, int interior = 0);
+	bool destroyObstacle(int obstacleID);
+	bool isObstacle(int obstacleID) const;
+	bool isSegmentBlocked(Vec3 from, Vec3 to, int virtualWorld, int interior) const;
 	bool connectNodes(int fromNode, int toNode, bool bidirectional, float cost = 0.0f);
 	bool disconnectNodes(int fromNode, int toNode, bool bidirectional);
 	int nearestNode(Vec3 position, int virtualWorld, int interior, float maxDistance) const;
@@ -126,6 +134,8 @@ private:
 	void setEdges(int nodeID, const std::vector<PathEdge>& edges);
 	bool upsertEdge(int fromNode, int toNode, float cost);
 	bool removeEdge(int fromNode, int toNode);
+	bool edgeBlocked(int fromNode, int toNode) const;
+	bool segmentIntersectsObstacle(Vec3 from, Vec3 to, const Entity& obstacle) const;
 	float distance(int a, int b) const;
 	float distance(Vec3 a, Vec3 b) const;
 	Vec3 midpoint(Vec3 a, Vec3 b) const;

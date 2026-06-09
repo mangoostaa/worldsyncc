@@ -19,6 +19,11 @@ namespace
 constexpr float NPCSpatialCellSize = 50.0f;
 constexpr std::chrono::milliseconds NPCSpatialUpdateInterval { 250 };
 
+bool between(float value, float min, float max)
+{
+	return value >= min && value <= max;
+}
+
 bool setPawnCell(AMX* amx, IPawnComponent* pawn, cell address, cell value)
 {
 	if (!pawn) return false;
@@ -118,9 +123,66 @@ bool PathModule::isNode(int nodeID) const
 	return core_.getType(nodeID, type) && type == PATH_NODE_TYPE;
 }
 
+int PathModule::createObstacle(Vec3 position, float width, float depth, float margin, int virtualWorld, int interior)
+{
+	if (width <= 0.0f || depth <= 0.0f || margin < 0.0f)
+	{
+		return 0;
+	}
+
+	const int id = core_.createEntity(PATH_OBSTACLE_TYPE, position, virtualWorld, interior);
+	if (!id)
+	{
+		return 0;
+	}
+
+	core_.setState(id, PATH_OBSTACLE_WIDTH, std::to_string(width));
+	core_.setState(id, PATH_OBSTACLE_DEPTH, std::to_string(depth));
+	core_.setState(id, PATH_OBSTACLE_MARGIN, std::to_string(margin));
+	invalidateRouteCache();
+	return id;
+}
+
+bool PathModule::destroyObstacle(int obstacleID)
+{
+	if (!isObstacle(obstacleID))
+	{
+		return false;
+	}
+
+	const bool destroyed = core_.destroyEntity(obstacleID);
+	if (destroyed)
+	{
+		invalidateRouteCache();
+	}
+	return destroyed;
+}
+
+bool PathModule::isObstacle(int obstacleID) const
+{
+	std::string type;
+	return core_.getType(obstacleID, type) && type == PATH_OBSTACLE_TYPE;
+}
+
+bool PathModule::isSegmentBlocked(Vec3 from, Vec3 to, int virtualWorld, int interior) const
+{
+	for (const Entity& entity : core_.entities())
+	{
+		if (entity.type == PATH_OBSTACLE_TYPE && entity.world == virtualWorld && entity.interior == interior && segmentIntersectsObstacle(from, to, entity))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 bool PathModule::connectNodes(int fromNode, int toNode, bool bidirectional, float cost)
 {
 	if (!isNode(fromNode) || !isNode(toNode) || fromNode == toNode)
+	{
+		return false;
+	}
+	if (edgeBlocked(fromNode, toNode))
 	{
 		return false;
 	}
@@ -210,6 +272,10 @@ int PathModule::findPath(int startNode, int endNode)
 		for (const PathEdge& edge : getEdges(current))
 		{
 			if (!isNode(edge.node))
+			{
+				continue;
+			}
+			if (edgeBlocked(current, edge.node))
 			{
 				continue;
 			}
@@ -946,6 +1012,67 @@ bool PathModule::removeEdge(int fromNode, int toNode)
 	return true;
 }
 
+bool PathModule::edgeBlocked(int fromNode, int toNode) const
+{
+	Vec3 from;
+	Vec3 to;
+	if (!core_.getPosition(fromNode, from) || !core_.getPosition(toNode, to))
+	{
+		return true;
+	}
+	return isSegmentBlocked(from, to, core_.getWorld(fromNode), core_.getInterior(fromNode));
+}
+
+bool PathModule::segmentIntersectsObstacle(Vec3 from, Vec3 to, const Entity& obstacle) const
+{
+	const float halfWidth = (core_.getStateFloat(obstacle.id, PATH_OBSTACLE_WIDTH, 0.0f) * 0.5f) + core_.getStateFloat(obstacle.id, PATH_OBSTACLE_MARGIN, 0.0f);
+	const float halfDepth = (core_.getStateFloat(obstacle.id, PATH_OBSTACLE_DEPTH, 0.0f) * 0.5f) + core_.getStateFloat(obstacle.id, PATH_OBSTACLE_MARGIN, 0.0f);
+	if (halfWidth <= 0.0f || halfDepth <= 0.0f)
+	{
+		return false;
+	}
+
+	const float minX = obstacle.position.x - halfWidth;
+	const float maxX = obstacle.position.x + halfWidth;
+	const float minY = obstacle.position.y - halfDepth;
+	const float maxY = obstacle.position.y + halfDepth;
+
+	if ((between(from.x, minX, maxX) && between(from.y, minY, maxY)) || (between(to.x, minX, maxX) && between(to.y, minY, maxY)))
+	{
+		return true;
+	}
+
+	const float dx = to.x - from.x;
+	const float dy = to.y - from.y;
+	float tMin = 0.0f;
+	float tMax = 1.0f;
+
+	auto clip = [&tMin, &tMax](float p, float q) {
+		if (std::fabs(p) < 0.0001f)
+		{
+			return q >= 0.0f;
+		}
+
+		const float r = q / p;
+		if (p < 0.0f)
+		{
+			if (r > tMax) return false;
+			if (r > tMin) tMin = r;
+		}
+		else
+		{
+			if (r < tMin) return false;
+			if (r < tMax) tMax = r;
+		}
+		return true;
+	};
+
+	return clip(-dx, from.x - minX)
+		&& clip(dx, maxX - from.x)
+		&& clip(-dy, from.y - minY)
+		&& clip(dy, maxY - from.y);
+}
+
 float PathModule::distance(int a, int b) const
 {
 	Vec3 pa;
@@ -1146,6 +1273,33 @@ static cell AMX_NATIVE_CALL n_WS_CreatePathNode(AMX*, cell* params)
 	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 5) return 0;
 	const Vec3 position { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
 	return s_pathModule->createNode(position, static_cast<int>(params[4]), static_cast<int>(params[5]));
+}
+
+static cell AMX_NATIVE_CALL n_WS_CreatePathObstacle(AMX*, cell* params)
+{
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 8) return 0;
+	const Vec3 position { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
+	return s_pathModule->createObstacle(
+		position,
+		amx_ctof(params[4]),
+		amx_ctof(params[5]),
+		amx_ctof(params[6]),
+		static_cast<int>(params[7]),
+		static_cast<int>(params[8]));
+}
+
+static cell AMX_NATIVE_CALL n_WS_DestroyPathObstacle(AMX*, cell* params)
+{
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 1) return 0;
+	return s_pathModule->destroyObstacle(static_cast<int>(params[1])) ? 1 : 0;
+}
+
+static cell AMX_NATIVE_CALL n_WS_IsPathBlocked(AMX*, cell* params)
+{
+	if (!s_pathModule || !params || params[0] / static_cast<cell>(sizeof(cell)) < 8) return 0;
+	const Vec3 from { amx_ctof(params[1]), amx_ctof(params[2]), amx_ctof(params[3]) };
+	const Vec3 to { amx_ctof(params[4]), amx_ctof(params[5]), amx_ctof(params[6]) };
+	return s_pathModule->isSegmentBlocked(from, to, static_cast<int>(params[7]), static_cast<int>(params[8])) ? 1 : 0;
 }
 
 static cell AMX_NATIVE_CALL n_WS_ConnectPathNodes(AMX*, cell* params)
@@ -1370,6 +1524,9 @@ static cell AMX_NATIVE_CALL n_WS_GetPatrolNPC(AMX*, cell* params)
 
 static const AMX_NATIVE_INFO PathNatives[] = {
 	{ "WS_CreatePathNode", n_WS_CreatePathNode },
+	{ "WS_CreatePathObstacle", n_WS_CreatePathObstacle },
+	{ "WS_DestroyPathObstacle", n_WS_DestroyPathObstacle },
+	{ "WS_IsPathBlocked", n_WS_IsPathBlocked },
 	{ "WS_ConnectPathNodes", n_WS_ConnectPathNodes },
 	{ "WS_DisconnectPathNodes", n_WS_DisconnectPathNodes },
 	{ "WS_GetNearestPathNode", n_WS_GetNearestPathNode },
