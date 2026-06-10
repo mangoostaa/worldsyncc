@@ -10,6 +10,7 @@ The goal is to let a gamemode build systems like houses, farms, guarded zones, r
 - Dirty tracking and autosave from the open.mp tick loop.
 - SQLite storage at `scriptfiles/WorldSync.db` when the Databases component is loaded.
 - File fallback at `scriptfiles/WorldSync.entities` when Databases is unavailable.
+- Optional config file at `scriptfiles/WorldSync.cfg` for log level, debug, storage mode and autosave interval.
 - Stable entity IDs across server restarts.
 - Spatial grid queries for nearby entities and nearest-entity lookup.
 - General Pawn callbacks for entity creation, destruction, state changes, load and save.

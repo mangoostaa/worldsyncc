@@ -7,6 +7,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cmath>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -16,10 +17,25 @@ namespace worlds
 {
 namespace
 {
-constexpr std::chrono::milliseconds AutosaveInterval { 30000 };
-constexpr const char* StoragePath = "scriptfiles/WorldSync.entities";
-constexpr const char* SQLitePath = "scriptfiles/WorldSync.db";
 constexpr float SpatialCellSize = 50.0f;
+
+std::string trim(std::string value)
+{
+	const auto notSpace = [](unsigned char ch) {
+		return !std::isspace(ch);
+	};
+	value.erase(value.begin(), std::find_if(value.begin(), value.end(), notSpace));
+	value.erase(std::find_if(value.rbegin(), value.rend(), notSpace).base(), value.end());
+	return value;
+}
+
+std::string lower(std::string value)
+{
+	std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+		return static_cast<char>(std::tolower(ch));
+	});
+	return value;
+}
 
 std::string escapeField(const std::string& value)
 {
@@ -46,6 +62,70 @@ int parseInt(const std::string& value, int fallback)
 	{
 		return fallback;
 	}
+}
+
+bool parseBool(const std::string& value, bool fallback)
+{
+	const std::string normalized = lower(trim(value));
+	if (normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on")
+	{
+		return true;
+	}
+	if (normalized == "0" || normalized == "false" || normalized == "no" || normalized == "off")
+	{
+		return false;
+	}
+	return fallback;
+}
+
+LogLevelFilter parseLogLevel(const std::string& value, LogLevelFilter fallback)
+{
+	const std::string normalized = lower(trim(value));
+	if (normalized == "error")
+	{
+		return LogLevelFilter::Error;
+	}
+	if (normalized == "warning" || normalized == "warn")
+	{
+		return LogLevelFilter::Warning;
+	}
+	if (normalized == "info")
+	{
+		return LogLevelFilter::Info;
+	}
+	if (normalized == "debug")
+	{
+		return LogLevelFilter::Debug;
+	}
+
+	const int parsed = parseInt(normalized, static_cast<int>(fallback));
+	if (parsed < 0)
+	{
+		return LogLevelFilter::Error;
+	}
+	if (parsed > 3)
+	{
+		return LogLevelFilter::Debug;
+	}
+	return static_cast<LogLevelFilter>(parsed);
+}
+
+StorageMode parseStorageMode(const std::string& value, StorageMode fallback)
+{
+	const std::string normalized = lower(trim(value));
+	if (normalized == "auto")
+	{
+		return StorageMode::Auto;
+	}
+	if (normalized == "sqlite" || normalized == "database" || normalized == "db")
+	{
+		return StorageMode::SQLite;
+	}
+	if (normalized == "file" || normalized == "snapshot" || normalized == "flatfile")
+	{
+		return StorageMode::File;
+	}
+	return fallback;
 }
 
 std::vector<std::string> splitEscaped(const std::string& line, char delimiter)
@@ -119,6 +199,78 @@ std::string sqlEscape(const std::string& value)
 void WorldSyncCore::setLogger(ILogger* logger)
 {
 	logger_ = logger;
+}
+
+bool WorldSyncCore::loadConfig(const std::string& path)
+{
+	Config loaded;
+	std::ifstream file(path);
+	if (!file.is_open())
+	{
+		config_ = std::move(loaded);
+		debugEnabled_ = config_.debug;
+		logLevel_ = debugEnabled_ ? LogLevelFilter::Debug : config_.logLevel;
+		return false;
+	}
+
+	std::string line;
+	while (std::getline(file, line))
+	{
+		const size_t comment = line.find_first_of("#;");
+		if (comment != std::string::npos)
+		{
+			line.resize(comment);
+		}
+
+		const size_t equals = line.find('=');
+		if (equals == std::string::npos)
+		{
+			continue;
+		}
+
+		const std::string key = lower(trim(line.substr(0, equals)));
+		const std::string value = trim(line.substr(equals + 1));
+		if (key.empty())
+		{
+			continue;
+		}
+
+		if (key == "log_level")
+		{
+			loaded.logLevel = parseLogLevel(value, loaded.logLevel);
+		}
+		else if (key == "debug")
+		{
+			loaded.debug = parseBool(value, loaded.debug);
+		}
+		else if (key == "storage_mode")
+		{
+			loaded.storageMode = parseStorageMode(value, loaded.storageMode);
+		}
+		else if (key == "autosave_interval_ms")
+		{
+			const int milliseconds = parseInt(value, static_cast<int>(loaded.autosaveInterval.count()));
+			loaded.autosaveInterval = std::chrono::milliseconds { std::max(0, milliseconds) };
+		}
+		else if (key == "snapshot_path" && !value.empty())
+		{
+			loaded.snapshotPath = value;
+		}
+		else if (key == "sqlite_path" && !value.empty())
+		{
+			loaded.sqlitePath = value;
+		}
+	}
+
+	config_ = std::move(loaded);
+	debugEnabled_ = config_.debug;
+	logLevel_ = debugEnabled_ ? LogLevelFilter::Debug : config_.logLevel;
+	log(LogLevelFilter::Info,
+		"WorldSync: config cargada desde %s (storage=%d autosave=%lldms).",
+		path.c_str(),
+		static_cast<int>(config_.storageMode),
+		static_cast<long long>(config_.autosaveInterval.count()));
+	return true;
 }
 
 void WorldSyncCore::setLogLevel(LogLevelFilter level)
@@ -220,7 +372,7 @@ bool WorldSyncCore::load()
 		return true;
 	}
 
-	std::ifstream file(StoragePath);
+	std::ifstream file(config_.snapshotPath);
 	if (!file.is_open())
 	{
 		lastLoadCount_ = 0;
@@ -596,7 +748,7 @@ void WorldSyncCore::tick(std::chrono::milliseconds elapsed)
 	}
 
 	autosaveElapsed_ += elapsed;
-	if (autosaveElapsed_ >= AutosaveInterval)
+	if (config_.autosaveInterval.count() > 0 && autosaveElapsed_ >= config_.autosaveInterval)
 	{
 		autosaveElapsed_ = std::chrono::milliseconds { 0 };
 		saveDirty();
@@ -801,9 +953,12 @@ void WorldSyncCore::simulateEntity(Entity& entity, std::chrono::milliseconds ela
 
 int WorldSyncCore::writeSnapshot(bool dirtyOnly)
 {
-	std::filesystem::create_directories("scriptfiles");
+	if (const std::filesystem::path parent = std::filesystem::path(config_.snapshotPath).parent_path(); !parent.empty())
+	{
+		std::filesystem::create_directories(parent);
+	}
 
-	std::ofstream file(StoragePath, std::ios::trunc);
+	std::ofstream file(config_.snapshotPath, std::ios::trunc);
 	if (!file.is_open())
 	{
 		return 0;
@@ -888,6 +1043,10 @@ bool WorldSyncCore::parseSnapshotLine(const std::string& line, Entity& entity) c
 
 bool WorldSyncCore::openSQLite()
 {
+	if (config_.storageMode == StorageMode::File)
+	{
+		return false;
+	}
 	if (sqliteReady_ && database_)
 	{
 		return true;
@@ -897,8 +1056,11 @@ bool WorldSyncCore::openSQLite()
 		return false;
 	}
 
-	std::filesystem::create_directories("scriptfiles");
-	database_ = databases_->open(SQLitePath);
+	if (const std::filesystem::path parent = std::filesystem::path(config_.sqlitePath).parent_path(); !parent.empty())
+	{
+		std::filesystem::create_directories(parent);
+	}
+	database_ = databases_->open(StringView(config_.sqlitePath.data(), config_.sqlitePath.size()));
 	if (!database_)
 	{
 		return false;

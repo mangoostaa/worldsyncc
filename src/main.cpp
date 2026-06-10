@@ -588,6 +588,7 @@ public:
 		core_ = c;
 		world_.setLogger(core_);
 		world_.addEventHandler(this);
+		world_.loadConfig();
 		gWorld = &world_;
 		core_->getEventDispatcher().addEventHandler(this);
 		core_->printLn("WorldSync v0.3.0 cargado.");

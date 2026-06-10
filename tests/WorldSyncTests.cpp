@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -64,6 +65,9 @@ void cleanStorage()
 {
 	std::filesystem::remove("scriptfiles/WorldSync.entities");
 	std::filesystem::remove("scriptfiles/WorldSync.db");
+	std::filesystem::remove("scriptfiles/WorldSync.test.cfg");
+	std::filesystem::remove("scriptfiles/custom.entities");
+	std::filesystem::remove("scriptfiles/custom.db");
 }
 
 void assertNear(float actual, float expected)
@@ -233,6 +237,36 @@ void testCoreEventCallbacks()
 	assert(events.created == 1);
 }
 
+void testConfigLoad()
+{
+	cleanStorage();
+	std::filesystem::create_directories("scriptfiles");
+	{
+		std::ofstream config("scriptfiles/WorldSync.test.cfg", std::ios::trunc);
+		config << "log_level = warning\n";
+		config << "debug = true\n";
+		config << "storage_mode = file\n";
+		config << "autosave_interval_ms = 1500\n";
+		config << "snapshot_path = scriptfiles/custom.entities\n";
+		config << "sqlite_path = scriptfiles/custom.db\n";
+	}
+
+	worlds::WorldSyncCore core;
+	assert(core.loadConfig("scriptfiles/WorldSync.test.cfg"));
+	assert(core.getLogLevel() == worlds::LogLevelFilter::Debug);
+	assert(core.isDebugEnabled());
+	assert(core.config().storageMode == worlds::StorageMode::File);
+	assert(core.config().autosaveInterval == std::chrono::milliseconds(1500));
+	assert(core.config().snapshotPath == "scriptfiles/custom.entities");
+	assert(core.config().sqlitePath == "scriptfiles/custom.db");
+
+	std::filesystem::remove("scriptfiles/custom.entities");
+	const int entity = core.createEntity("cfg", worlds::Vec3 {}, 0, 0);
+	assert(entity == 1);
+	core.tick(std::chrono::milliseconds(1500));
+	assert(std::filesystem::exists("scriptfiles/custom.entities"));
+}
+
 void testCropModuleGrowthAndHarvest()
 {
 	cleanStorage();
@@ -370,6 +404,7 @@ int main()
 	testFallbackPersistenceRoundTrip();
 	testSpatialGridQueries();
 	testCoreEventCallbacks();
+	testConfigLoad();
 	testCropModuleGrowthAndHarvest();
 	testVehicleModulePersistenceFallback();
 	testPathModuleAStar();

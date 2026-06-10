@@ -58,6 +58,27 @@ to your Pawn compiler include directory.
 
 5. Enable the component/plugin in your open.mp server configuration using the same loading method used by your server for native components.
 
+## Optional Configuration
+
+WorldSync looks for this file on startup:
+
+```text
+scriptfiles/WorldSync.cfg
+```
+
+If the file is missing, built-in defaults are used. Supported keys:
+
+```ini
+log_level = info
+debug = false
+storage_mode = auto
+autosave_interval_ms = 30000
+snapshot_path = scriptfiles/WorldSync.entities
+sqlite_path = scriptfiles/WorldSync.db
+```
+
+`log_level` accepts `error`, `warning`, `info` or `debug`. `storage_mode` accepts `auto`, `sqlite` or `file`. Set `autosave_interval_ms = 0` to disable periodic autosave; manual `WS_Save()` still works.
+
 ## Install On Linux
 
 Linux builds should be made from a Linux environment with a C++17 compiler and CMake.

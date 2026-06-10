@@ -20,6 +20,8 @@ new gPathB;
 new gPathC;
 new gPathD;
 new gObstacle;
+new gBeacon;
+new gRouteNpcPath;
 new gCropPickup = -1;
 new gGuardNpc = INVALID_NPC_ID;
 new gGuardPatrol;
@@ -204,6 +206,29 @@ stock DemoSetupCrop()
 	return gCrop;
 }
 
+stock DemoSetupGenericEntities()
+{
+	gBeacon = DemoKeepOneByState("marker", "beacon");
+	if (!gBeacon)
+	{
+		gBeacon = WS_CreateEntity("marker", 1536.0, -1688.0, 13.5, DEMO_WORLD, DEMO_INT);
+		WS_SetState(gBeacon, "demo", "beacon");
+		WS_SetState(gBeacon, "name", "Simulated beacon");
+		WS_SetStateInt(gBeacon, "uses", 0);
+		WS_SetStateFloat(gBeacon, "pulse", 0.0);
+		WS_SetStateBool(gBeacon, "enabled", true);
+		WS_SetSimulated(gBeacon, true);
+	}
+
+	DemoCreateLabel("WorldSync Entity\n/wsbeacon pulsa\n/wsinspect estado", 1536.0, -1688.0, 15.0);
+	printf("[Derby/WorldSync] Marker entity=%d enabled=%d uses=%d pulse=%.2f",
+		gBeacon,
+		WS_GetStateBool(gBeacon, "enabled", false) ? 1 : 0,
+		WS_GetStateInt(gBeacon, "uses", 0),
+		WS_GetStateFloat(gBeacon, "pulse", 0.0));
+	return gBeacon;
+}
+
 stock DemoSetupPath()
 {
 	new Float:ax = 1502.0, Float:ay = -1677.0, Float:az = 13.5;
@@ -270,6 +295,7 @@ stock DemoSetupPath()
 	new directConnected = WS_ConnectPathNodes(gPathA, gPathD, true, 0.0);
 	WS_ClearPathCache();
 	gRoute = WS_FindPath(gPathA, gPathD);
+	gRouteNpcPath = WS_CreateNPCPath(gRoute, 1.2);
 
 	CreateObject(19353, 1517.0, -1677.0, 14.2, 0.0, 0.0, 90.0, 300.0);
 	CreateObject(19353, 1523.0, -1677.0, 14.2, 0.0, 0.0, 90.0, 300.0);
@@ -286,6 +312,7 @@ stock DemoSetupPath()
 		gObstacle,
 		directBlocked,
 		directConnected);
+	printf("[Derby/WorldSync] NPC path handle=%d from route=%d", gRouteNpcPath, gRoute);
 	return gRoute;
 }
 
@@ -372,8 +399,9 @@ stock DemoStartNPCPatrol(playerid)
 stock DemoShowHelp(playerid)
 {
 	DemoMsg(playerid, COLOR_YELLOW, "WorldSync demo: /wsdemo /wsstats /wsdoor /wslock /wscar /wsrepair");
-	DemoMsg(playerid, COLOR_YELLOW, "WorldSync demo: /wscrop /wsgrow /wsharvest /wsnear /wspath /wsdebug /wssave");
-	DemoMsg(playerid, COLOR_YELLOW, "WorldSync NPC: /wsnpc /wsnpcgo /wsnpcstop /wsnpcnear");
+	DemoMsg(playerid, COLOR_YELLOW, "WorldSync demo: /wscrop /wsgrow /wsharvest /wsnear /wsinspect /wsbeacon");
+	DemoMsg(playerid, COLOR_YELLOW, "WorldSync path: /wspath /wsnode /wscache /wspathgo /wsdebug /wssave");
+	DemoMsg(playerid, COLOR_YELLOW, "WorldSync NPC: /wsnpc /wsnpcgo /wsnpcstop /wspause /wsresume /wsnpcnear");
 	DemoMsg(playerid, COLOR_GREY, "Tip: reinicia el server y vas a ver que las entidades vuelven desde SQLite.");
 	return 1;
 }
@@ -425,6 +453,7 @@ public WorldSyncDemo_Init()
 	DemoSetupDoor();
 	DemoSetupVehicle();
 	DemoSetupCrop();
+	DemoSetupGenericEntities();
 	DemoSetupPath();
 	DemoSetupNPC();
 	SetTimer("WorldSyncDemo_StartNPC", 2500, false);
@@ -457,6 +486,16 @@ public WorldSyncDemo_Tick()
 			WS_GetNearestNPC(x, y, z, DEMO_WORLD, DEMO_INT, 80.0),
 			gGuardPatrol,
 			patrolActive);
+	}
+	if (gBeacon && WS_EntityExists(gBeacon) && WS_GetStateBool(gBeacon, "enabled", false))
+	{
+		new Float:pulse = WS_GetStateFloat(gBeacon, "pulse", 0.0) + 0.25;
+		if (pulse > 10.0)
+		{
+			pulse = 0.0;
+		}
+		WS_SetStateFloat(gBeacon, "pulse", pulse);
+		printf("[Derby/WorldSync] Beacon %d pulse=%.2f uses=%d", gBeacon, pulse, WS_GetStateInt(gBeacon, "uses", 0));
 	}
 	return 1;
 }
@@ -609,6 +648,52 @@ public OnPlayerCommandText(playerid, cmdtext[])
 		return 1;
 	}
 
+	if (!strcmp(cmdtext, "/wsinspect", true))
+	{
+		new Float:x, Float:y, Float:z, Float:ex, Float:ey, Float:ez;
+		new type[24], name[48], demo[32], line[144];
+		GetPlayerPos(playerid, x, y, z);
+		new entity = WS_GetNearestEntity(x, y, z, DEMO_WORLD, DEMO_INT, 80.0, "");
+		if (!entity || !WS_EntityExists(entity))
+		{
+			DemoMsg(playerid, COLOR_RED, "No hay entidades WorldSync cerca.");
+			return 1;
+		}
+		WS_GetEntityType(entity, type);
+		WS_GetEntityPos(entity, ex, ey, ez);
+		WS_GetState(entity, "name", name, sizeof(name));
+		WS_GetState(entity, "demo", demo, sizeof(demo));
+		format(line, sizeof(line), "Entity=%d type=%s name=%s demo=%s pos=%.1f %.1f %.1f",
+			entity, type, name, demo, ex, ey, ez);
+		DemoMsg(playerid, COLOR_BLUE, line);
+		format(line, sizeof(line), "state owner=%d uses=%d pulse=%.2f enabled=%d",
+			WS_GetStateInt(entity, "owner", -1),
+			WS_GetStateInt(entity, "uses", 0),
+			WS_GetStateFloat(entity, "pulse", 0.0),
+			WS_GetStateBool(entity, "enabled", false) ? 1 : 0);
+		DemoMsg(playerid, COLOR_BLUE, line);
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsbeacon", true))
+	{
+		if (!gBeacon || !WS_EntityExists(gBeacon))
+		{
+			DemoMsg(playerid, COLOR_RED, "Beacon no disponible.");
+			return 1;
+		}
+		new Float:x, Float:y, Float:z, line[128];
+		GetPlayerPos(playerid, x, y, z);
+		WS_SetEntityPos(gBeacon, x + 2.0, y, z);
+		WS_SetStateInt(gBeacon, "uses", WS_GetStateInt(gBeacon, "uses", 0) + 1);
+		WS_SetStateBool(gBeacon, "enabled", !WS_GetStateBool(gBeacon, "enabled", false));
+		format(line, sizeof(line), "Beacon movido. uses=%d enabled=%d",
+			WS_GetStateInt(gBeacon, "uses", 0),
+			WS_GetStateBool(gBeacon, "enabled", false) ? 1 : 0);
+		DemoMsg(playerid, COLOR_GREEN, line);
+		return 1;
+	}
+
 	if (!strcmp(cmdtext, "/wspath", true))
 	{
 		new line[128];
@@ -621,6 +706,34 @@ public OnPlayerCommandText(playerid, cmdtext[])
 			WS_IsPathBlocked(1502.0, -1677.0, 13.5, 1544.0, -1677.0, 13.5, DEMO_WORLD, DEMO_INT) ? 1 : 0);
 		DemoMsg(playerid, COLOR_GREEN, line);
 		DemoMsg(playerid, COLOR_GREEN, "Debug de path activo. Mira labels/ruta; /wsdebug lo apaga.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsnode", true))
+	{
+		new Float:x, Float:y, Float:z, Float:nx, Float:ny, Float:nz, line[128];
+		GetPlayerPos(playerid, x, y, z);
+		new node = WS_GetNearestPathNode(x, y, z, DEMO_WORLD, DEMO_INT, 80.0);
+		if (!node || !WS_GetEntityPos(node, nx, ny, nz))
+		{
+			DemoMsg(playerid, COLOR_RED, "No hay path_node cerca.");
+			return 1;
+		}
+		format(line, sizeof(line), "Nearest path_node=%d pos=%.1f %.1f %.1f routeLen=%d",
+			node, nx, ny, nz, WS_GetPathLength(gRoute));
+		DemoMsg(playerid, COLOR_BLUE, line);
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wscache", true))
+	{
+		new line[96];
+		WS_ClearPathCache();
+		gRoute = WS_FindPath(gPathA, gPathD);
+		gRouteNpcPath = WS_CreateNPCPath(gRoute, 1.2);
+		format(line, sizeof(line), "Path cache recalculada: route=%d len=%d cache=%d npcPath=%d",
+			gRoute, WS_GetPathLength(gRoute), WS_GetPathCacheSize(), gRouteNpcPath);
+		DemoMsg(playerid, COLOR_GREEN, line);
 		return 1;
 	}
 
@@ -645,6 +758,30 @@ public OnPlayerCommandText(playerid, cmdtext[])
 		return 1;
 	}
 
+	if (!strcmp(cmdtext, "/wspause", true))
+	{
+		if (!gGuardPatrol)
+		{
+			DemoMsg(playerid, COLOR_RED, "No hay patrol activo para pausar.");
+			return 1;
+		}
+		WS_PausePatrol(gGuardPatrol);
+		DemoMsg(playerid, COLOR_YELLOW, "NPC patrol pausado con WS_PausePatrol.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wsresume", true))
+	{
+		if (!gGuardPatrol)
+		{
+			DemoMsg(playerid, COLOR_RED, "No hay patrol activo para reanudar.");
+			return 1;
+		}
+		WS_ResumePatrol(gGuardPatrol);
+		DemoMsg(playerid, COLOR_GREEN, "NPC patrol reanudado con WS_ResumePatrol.");
+		return 1;
+	}
+
 	if (!strcmp(cmdtext, "/wsnpcgo", true))
 	{
 		if (gGuardNpc == INVALID_NPC_ID || !NPC_IsValid(gGuardNpc))
@@ -654,6 +791,18 @@ public OnPlayerCommandText(playerid, cmdtext[])
 		}
 		WS_NPCGoTo(gGuardNpc, 1544.0, -1677.0, 13.5, DEMO_WORLD, DEMO_INT, 80.0, WS_NPC_MOVE_JOG, 0.65);
 		DemoMsg(playerid, COLOR_GREEN, "NPC enviado al nodo D con WS_NPCGoTo.");
+		return 1;
+	}
+
+	if (!strcmp(cmdtext, "/wspathgo", true))
+	{
+		if (gGuardNpc == INVALID_NPC_ID || !NPC_IsValid(gGuardNpc))
+		{
+			DemoMsg(playerid, COLOR_RED, "NPC no disponible.");
+			return 1;
+		}
+		WS_MoveNPCByPath(gGuardNpc, gRoute, WS_NPC_MOVE_SPRINT, -1.0, true);
+		DemoMsg(playerid, COLOR_GREEN, "NPC moviendose por la ruta en reversa con WS_MoveNPCByPath.");
 		return 1;
 	}
 
@@ -693,7 +842,10 @@ public OnPlayerCommandText(playerid, cmdtext[])
 		GetPlayerPos(playerid, x, y, z);
 		new entity = WS_CreateEntity("marker", x, y, z, DEMO_WORLD, DEMO_INT);
 		WS_SetState(entity, "demo", "player_marker");
+		WS_SetState(entity, "name", "Player marker");
 		WS_SetStateInt(entity, "owner", playerid);
+		WS_SetStateFloat(entity, "pulse", 1.0);
+		WS_SetStateBool(entity, "enabled", true);
 		WS_SetSimulated(entity, true);
 		format(line, sizeof(line), "Entidad generica creada: id=%d type=marker simulated=1", entity);
 		DemoMsg(playerid, COLOR_GREEN, line);

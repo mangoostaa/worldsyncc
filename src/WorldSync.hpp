@@ -46,6 +46,31 @@ struct Stats
 	int lastSaveChanged = 0;
 };
 
+enum class LogLevelFilter
+{
+	Error = 0,
+	Warning = 1,
+	Info = 2,
+	Debug = 3
+};
+
+enum class StorageMode
+{
+	Auto,
+	SQLite,
+	File
+};
+
+struct Config
+{
+	LogLevelFilter logLevel = LogLevelFilter::Info;
+	bool debug = false;
+	StorageMode storageMode = StorageMode::Auto;
+	std::chrono::milliseconds autosaveInterval { 30000 };
+	std::string snapshotPath = "scriptfiles/WorldSync.entities";
+	std::string sqlitePath = "scriptfiles/WorldSync.db";
+};
+
 class WorldSyncEventHandler
 {
 public:
@@ -57,18 +82,12 @@ public:
 	virtual void onWorldSaved(int entityCount, int changedCount, bool dirtyOnly) {}
 };
 
-enum class LogLevelFilter
-{
-	Error = 0,
-	Warning = 1,
-	Info = 2,
-	Debug = 3
-};
-
 class WorldSyncCore
 {
 public:
 	void setLogger(ILogger* logger);
+	bool loadConfig(const std::string& path = "scriptfiles/WorldSync.cfg");
+	const Config& config() const { return config_; }
 	void setLogLevel(LogLevelFilter level);
 	LogLevelFilter getLogLevel() const { return logLevel_; }
 	void setDebugEnabled(bool enabled);
@@ -158,6 +177,7 @@ private:
 	IDatabasesComponent* databases_ = nullptr;
 	IDatabaseConnection* database_ = nullptr;
 	ILogger* logger_ = nullptr;
+	Config config_;
 	LogLevelFilter logLevel_ = LogLevelFilter::Info;
 	bool debugEnabled_ = false;
 	bool sqliteReady_ = false;
