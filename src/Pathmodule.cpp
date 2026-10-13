@@ -572,12 +572,79 @@ int PathModule::npcGoTo(int npcID, Vec3 destination, int virtualWorld, int inter
 		return 0;
 	}
 
-	if (!moveNPCByRoute(npcID, routeID, moveType, speed, false))
+	const auto route = routes_.find(routeID);
+	if (route == routes_.end() || route->second.nodes.empty())
 	{
 		destroyRoute(routeID);
 		return 0;
 	}
 
+	const int pathID = npcs_->createPath();
+	if (pathID < 0)
+	{
+		destroyRoute(routeID);
+		return 0;
+	}
+
+	constexpr float stopRange = 1.0f;
+	int points = 0;
+	Vec3 lastPoint;
+	for (int nodeID : route->second.nodes)
+	{
+		Vec3 position;
+		if (core_.getPosition(nodeID, position) && npcs_->addPointToPath(pathID, toVector3(position), stopRange))
+		{
+			lastPoint = position;
+			++points;
+		}
+	}
+
+	const bool destinationAlreadyReached = points > 0 && distance(lastPoint, destination) <= stopRange;
+	if (!destinationAlreadyReached)
+	{
+		if (!npcs_->addPointToPath(pathID, toVector3(destination), stopRange))
+		{
+			npcs_->destroyPath(pathID);
+			destroyRoute(routeID);
+			return 0;
+		}
+		++points;
+	}
+	if (points == 0)
+	{
+		npcs_->destroyPath(pathID);
+		destroyRoute(routeID);
+		return 0;
+	}
+
+	for (auto& item : patrols_)
+	{
+		if (item.second.npcID == npcID && item.second.active)
+		{
+			stopPatrol(item.first);
+		}
+	}
+	const auto oldPath = transientNPCPaths_.find(npcID);
+	if (oldPath != transientNPCPaths_.end())
+	{
+		npc->stopPath();
+		npcs_->destroyPath(oldPath->second);
+		transientNPCPaths_.erase(oldPath);
+	}
+	const auto oldRoute = transientRoutes_.find(npcID);
+	if (oldRoute != transientRoutes_.end())
+	{
+		destroyRoute(oldRoute->second);
+		transientRoutes_.erase(oldRoute);
+	}
+	if (!npc->moveByPath(pathID, moveType, speed, false))
+	{
+		npcs_->destroyPath(pathID);
+		destroyRoute(routeID);
+		return 0;
+	}
+
+	transientNPCPaths_[npcID] = pathID;
 	transientRoutes_[npcID] = routeID;
 	return routeID;
 }
