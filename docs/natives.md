@@ -71,7 +71,7 @@ Return convention: most mutating natives return `1` on success and `0` on failur
 
 | Native | Description | Parameters | Example |
 | --- | --- | --- | --- |
-| `WS_CreateDoor(model, Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz, Float:open_rx, Float:open_ry, Float:open_rz, virtualworld = 0, interior = 0)` | Creates a persistent door and an open.mp object if Objects is loaded. | Model, position, closed rotation, open rotation, scope. | `new d = WS_CreateDoor(1495, x, y, z, 0.0, 0.0, 0.0, 0.0, 0.0, 90.0);` |
+| `WS_CreateDoor(model, Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz, Float:open_rx, Float:open_ry, Float:open_rz, virtualworld = 0, interior = 0)` | Creates a persistent door and an open.mp object if Objects is loaded. The object is assigned to the entity virtual world; the Objects component does not expose an interior setting for global objects. | Model, position, closed rotation, open rotation, scope. | `new d = WS_CreateDoor(1495, x, y, z, 0.0, 0.0, 0.0, 0.0, 0.0, 90.0);` |
 | `WS_DestroyDoor(doorid)` | Destroys a door entity and its object. | `doorid`: WorldSync door entity ID. | `WS_DestroyDoor(d);` |
 | `WS_SetDoorOpen(doorid, bool:open)` | Opens or closes the door by rotating the object. | `open`: true/false. | `WS_SetDoorOpen(d, true);` |
 | `bool:WS_IsDoorOpen(doorid)` | Returns door open state. | `doorid`: door ID. | `if (WS_IsDoorOpen(d)) { }` |

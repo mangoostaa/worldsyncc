@@ -45,6 +45,7 @@ native WS_GetEntityInterior(entityid);
 native WS_GetEntityCount();
 native WS_GetEntityIDAt(index);
 native WS_GetNearestEntity(Float:x, Float:y, Float:z, virtualworld = 0, interior = 0, Float:maxDistance = 50.0, const type[] = "");
+// maxEntities must not exceed the declared size of entityids. The same rule applies to WS_GetNPCsInRange.
 native WS_GetEntitiesInRange(Float:x, Float:y, Float:z, entityids[], maxEntities = sizeof(entityids), virtualworld = 0, interior = 0, Float:radius = 50.0, const type[] = "");
 native WS_FindEntitiesByState(const type[], const key[], const value[], entityids[], maxEntities = sizeof(entityids));
 native WS_CountEntitiesByState(const type[], const key[], const value[]);

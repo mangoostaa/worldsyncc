@@ -1,3 +1,6 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include "WorldSync.hpp"
 
 #include <Server/Components/Databases/databases.hpp>
@@ -12,6 +15,15 @@
 #include <fstream>
 #include <limits>
 #include <sstream>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#else
+#include <cstdio>
+#endif
 
 namespace worlds
 {
@@ -578,6 +590,10 @@ bool WorldSyncCore::setPosition(int id, Vec3 position)
 	entity->position = position;
 	entity->dirty = true;
 	addToSpatialGrid(*entity);
+	for (WorldSyncEventHandler* handler : eventHandlers_)
+	{
+		handler->onEntityPositionChanged(*entity);
+	}
 	return true;
 }
 
@@ -953,22 +969,29 @@ void WorldSyncCore::simulateEntity(Entity& entity, std::chrono::milliseconds ela
 
 int WorldSyncCore::writeSnapshot(bool dirtyOnly)
 {
-	if (const std::filesystem::path parent = std::filesystem::path(config_.snapshotPath).parent_path(); !parent.empty())
+	const std::filesystem::path targetPath(config_.snapshotPath);
+	const std::filesystem::path temporaryPath(config_.snapshotPath + ".tmp");
+	std::error_code filesystemError;
+	if (const std::filesystem::path parent = targetPath.parent_path(); !parent.empty())
 	{
-		std::filesystem::create_directories(parent);
+		std::filesystem::create_directories(parent, filesystemError);
+		if (filesystemError)
+		{
+			log(LogLevelFilter::Error, "WorldSync: no se pudo crear el directorio del snapshot (%s).", filesystemError.message().c_str());
+			return 0;
+		}
 	}
 
-	std::ofstream file(config_.snapshotPath, std::ios::trunc);
+	std::ofstream file(temporaryPath, std::ios::trunc);
 	if (!file.is_open())
 	{
+		log(LogLevelFilter::Error, "WorldSync: no se pudo abrir el snapshot temporal (%s).", temporaryPath.string().c_str());
 		return 0;
 	}
 
 	int changed = deletedSinceSave_;
-	for (Entity& entity : entities_)
+	for (const Entity& entity : entities_)
 	{
-		const bool wasDirty = entity.dirty;
-
 		file << entity.id << '|'
 			 << escapeField(entity.type) << '|'
 			 << entity.position.x << '|'
@@ -983,23 +1006,52 @@ int WorldSyncCore::writeSnapshot(bool dirtyOnly)
 			file << '|' << escapeField(item.first) << '=' << escapeField(item.second);
 		}
 		file << '\n';
-
-		entity.dirty = false;
-		if (!dirtyOnly || wasDirty)
+		if (!dirtyOnly || entity.dirty)
 		{
 			++changed;
 		}
 	}
 
+	file.flush();
+	const bool writeSucceeded = file.good();
+	file.close();
+	if (!writeSucceeded || file.fail())
+	{
+		std::filesystem::remove(temporaryPath, filesystemError);
+		log(LogLevelFilter::Error, "WorldSync: falló la escritura del snapshot; los cambios quedan pendientes.");
+		return 0;
+	}
+
+#ifdef _WIN32
+	const bool replaced = MoveFileExW(temporaryPath.c_str(), targetPath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+	if (!replaced)
+	{
+		const DWORD error = GetLastError();
+		std::filesystem::remove(temporaryPath, filesystemError);
+		log(LogLevelFilter::Error, "WorldSync: no se pudo reemplazar el snapshot (Windows error %lu); los cambios quedan pendientes.", static_cast<unsigned long>(error));
+		return 0;
+	}
+#else
+	if (std::rename(temporaryPath.c_str(), targetPath.c_str()) != 0)
+	{
+		std::filesystem::remove(temporaryPath, filesystemError);
+		log(LogLevelFilter::Error, "WorldSync: no se pudo reemplazar el snapshot; los cambios quedan pendientes.");
+		return 0;
+	}
+#endif
+
 	deletedSinceSave_ = 0;
 	deletedEntityIDs_.clear();
+	for (Entity& entity : entities_)
+	{
+		entity.dirty = false;
+	}
 	++saveCount_;
 	lastSaveCount_ = static_cast<int>(entities_.size());
 	lastSaveChanged_ = changed;
 	fireWorldSaved(changed, dirtyOnly);
 	return changed;
 }
-
 bool WorldSyncCore::parseSnapshotLine(const std::string& line, Entity& entity) const
 {
 	const std::vector<std::string> fields = splitEscaped(line, '|');

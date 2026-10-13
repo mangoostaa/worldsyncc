@@ -52,7 +52,7 @@ struct NPCSpatialEntry
 	int interior = 0;
 };
 
-class PathModule : public NPCEventHandler
+class PathModule : public NPCEventHandler, public WorldSyncEventHandler
 {
 public:
 	PathModule(WorldSyncCore& core, IPawnComponent* pawn, INPCComponent* npcs, ITextLabelsComponent* textLabels, ICore* omp)
@@ -62,6 +62,7 @@ public:
 		, textLabels_(textLabels)
 		, omp_(omp)
 	{
+		core_.addEventHandler(this);
 		if (npcs_)
 		{
 			npcs_->getEventDispatcher().addEventHandler(this);
@@ -111,6 +112,11 @@ public:
 	bool showRouteDebug(int routeID);
 	void clearPathDebug();
 
+	void onEntityCreated(const Entity& entity) override;
+	void onEntityDestroyed(int entityID, const std::string& type) override;
+	void onEntityStateChanged(const Entity& entity, const std::string& key, const std::string& oldValue, const std::string& newValue) override;
+	void onEntityPositionChanged(const Entity& entity) override;
+	void onWorldLoaded(int entityCount, bool storageAvailable) override;
 	void onNPCFinishMovePathPoint(INPC& npc, int pathId, int pointId) override;
 	void onNPCFinishMovePath(INPC& npc, int pathId) override;
 	void onNPCCreate(INPC& npc) override;
@@ -172,6 +178,8 @@ private:
 	std::unordered_map<int, Route> routes_;
 	std::unordered_map<std::string, std::vector<int>> routeCache_;
 	std::unordered_map<int, Patrol> patrols_;
+	std::unordered_map<int, int> transientNPCPaths_;
+	std::unordered_map<int, int> transientRoutes_;
 	mutable std::unordered_map<int, std::vector<PathEdge>> edgeCache_;
 	std::unordered_map<NPCSpatialCell, std::vector<int>, NPCSpatialCellHash> npcSpatialGrid_;
 	std::unordered_map<int, NPCSpatialEntry> npcSpatialEntries_;

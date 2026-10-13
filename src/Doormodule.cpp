@@ -255,6 +255,7 @@ bool DoorModule::createObjectForDoor(int doorID)
 		return false;
 	}
 
+	object->setVirtualWorld(core_.getWorld(doorID));
 	doorObjects_[doorID] = object->getID();
 	return true;
 }

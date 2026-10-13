@@ -104,9 +104,25 @@ struct OpenNode
 
 PathModule::~PathModule()
 {
+	core_.removeEventHandler(this);
 	clearPathDebug();
 	if (npcs_)
 	{
+		for (const auto& item : transientNPCPaths_)
+		{
+			if (INPC* npc = npcs_->get(item.first))
+			{
+				npc->stopPath();
+			}
+			npcs_->destroyPath(item.second);
+		}
+		for (const auto& item : patrols_)
+		{
+			if (item.second.npcPathID >= 0)
+			{
+				npcs_->destroyPath(item.second.npcPathID);
+			}
+		}
 		npcs_->getEventDispatcher().removeEventHandler(this);
 	}
 }
@@ -117,6 +133,110 @@ int PathModule::createNode(Vec3 position, int virtualWorld, int interior)
 	return core_.createEntity(PATH_NODE_TYPE, position, virtualWorld, interior);
 }
 
+void PathModule::onEntityCreated(const Entity& entity)
+{
+	if (entity.type == PATH_NODE_TYPE || entity.type == PATH_OBSTACLE_TYPE)
+	{
+		invalidateRouteCache();
+	}
+}
+
+void PathModule::onEntityDestroyed(int entityID, const std::string& type)
+{
+	if (type != PATH_NODE_TYPE && type != PATH_OBSTACLE_TYPE)
+	{
+		return;
+	}
+
+	invalidateRouteCache();
+	if (type != PATH_NODE_TYPE)
+	{
+		return;
+	}
+
+	edgeCache_.erase(entityID);
+	std::vector<int> invalidRoutes;
+	for (const auto& route : routes_)
+	{
+		if (std::find(route.second.nodes.begin(), route.second.nodes.end(), entityID) != route.second.nodes.end())
+		{
+			invalidRoutes.push_back(route.first);
+		}
+	}
+	for (int routeID : invalidRoutes)
+	{
+		routes_.erase(routeID);
+	}
+	for (auto patrol = patrols_.begin(); patrol != patrols_.end();)
+	{
+		if (std::find(invalidRoutes.begin(), invalidRoutes.end(), patrol->second.routeID) != invalidRoutes.end())
+		{
+			stopPatrol(patrol->first);
+			patrol = patrols_.erase(patrol);
+		}
+		else
+		{
+			++patrol;
+		}
+	}
+}
+
+void PathModule::onEntityStateChanged(const Entity& entity, const std::string& key, const std::string&, const std::string&)
+{
+	if (entity.type == PATH_NODE_TYPE && key == PATH_KEY_EDGES)
+	{
+		edgeCache_.erase(entity.id);
+		invalidateRouteCache();
+	}
+	else if (entity.type == PATH_OBSTACLE_TYPE
+		&& (key == PATH_OBSTACLE_WIDTH || key == PATH_OBSTACLE_DEPTH || key == PATH_OBSTACLE_MARGIN))
+	{
+		invalidateRouteCache();
+	}
+}
+
+void PathModule::onWorldLoaded(int, bool storageAvailable)
+{
+	if (!storageAvailable)
+	{
+		return;
+	}
+	clearRouteCache();
+	edgeCache_.clear();
+	routes_.clear();
+	for (const auto& item : transientNPCPaths_)
+	{
+		if (npcs_)
+		{
+			if (INPC* npc = npcs_->get(item.first))
+			{
+				npc->stopPath();
+			}
+			npcs_->destroyPath(item.second);
+		}
+	}
+	for (const auto& item : patrols_)
+	{
+		if (npcs_ && item.second.npcPathID >= 0)
+		{
+			if (INPC* npc = npcs_->get(item.second.npcID))
+			{
+				npc->stopPath();
+			}
+			npcs_->destroyPath(item.second.npcPathID);
+		}
+	}
+	transientNPCPaths_.clear();
+	transientRoutes_.clear();
+	patrols_.clear();
+}
+void PathModule::onEntityPositionChanged(const Entity& entity)
+{
+	if (entity.type == PATH_NODE_TYPE || entity.type == PATH_OBSTACLE_TYPE)
+	{
+		invalidateRouteCache();
+	}
+}
 bool PathModule::isNode(int nodeID) const
 {
 	std::string type;
@@ -187,6 +307,11 @@ bool PathModule::connectNodes(int fromNode, int toNode, bool bidirectional, floa
 		return false;
 	}
 
+	if (core_.getWorld(fromNode) != core_.getWorld(toNode) || core_.getInterior(fromNode) != core_.getInterior(toNode))
+	{
+		return false;
+	}
+
 	const float finalCost = cost > 0.0f ? cost : distance(fromNode, toNode);
 	const bool forward = upsertEdge(fromNode, toNode, finalCost);
 	const bool backward = !bidirectional || upsertEdge(toNode, fromNode, finalCost);
@@ -242,7 +367,7 @@ int PathModule::findPath(int startNode, int endNode)
 	std::unordered_set<int> closed;
 
 	gScore[startNode] = 0.0f;
-	open.push(OpenNode { startNode, distance(startNode, endNode) });
+	open.push(OpenNode { startNode, 0.0f });
 
 	while (!open.empty())
 	{
@@ -285,7 +410,7 @@ int PathModule::findPath(int startNode, int endNode)
 			{
 				cameFrom[edge.node] = current;
 				gScore[edge.node] = tentative;
-				open.push(OpenNode { edge.node, tentative + distance(edge.node, endNode) });
+				open.push(OpenNode { edge.node, tentative });
 			}
 		}
 	}
@@ -382,15 +507,40 @@ bool PathModule::moveNPCByRoute(int npcID, int routeID, NPCMoveType moveType, fl
 		return false;
 	}
 
+	for (auto& item : patrols_)
+	{
+		if (item.second.npcID == npcID && item.second.active)
+		{
+			stopPatrol(item.first);
+		}
+	}
+	const auto oldPath = transientNPCPaths_.find(npcID);
+	if (oldPath != transientNPCPaths_.end())
+	{
+		npc->stopPath();
+		npcs_->destroyPath(oldPath->second);
+		transientNPCPaths_.erase(oldPath);
+	}
+	const auto oldRoute = transientRoutes_.find(npcID);
+	if (oldRoute != transientRoutes_.end())
+	{
+		destroyRoute(oldRoute->second);
+		transientRoutes_.erase(oldRoute);
+	}
+
 	const int pathID = createNPCPath(routeID, 1.0f);
 	if (pathID < 0)
 	{
 		return false;
 	}
-
-	return npc->moveByPath(pathID, moveType, speed, reverse);
+	if (!npc->moveByPath(pathID, moveType, speed, reverse))
+	{
+		npcs_->destroyPath(pathID);
+		return false;
+	}
+	transientNPCPaths_[npcID] = pathID;
+	return true;
 }
-
 int PathModule::npcGoTo(int npcID, Vec3 destination, int virtualWorld, int interior, float nodeSearchRadius, NPCMoveType moveType, float speed)
 {
 	if (!npcs_)
@@ -428,6 +578,7 @@ int PathModule::npcGoTo(int npcID, Vec3 destination, int virtualWorld, int inter
 		return 0;
 	}
 
+	transientRoutes_[npcID] = routeID;
 	return routeID;
 }
 
@@ -896,6 +1047,21 @@ void PathModule::onNPCFinishMovePath(INPC& npc, int pathId)
 	Patrol* patrol = findPatrolByNPCPath(pathId);
 	if (!patrol || patrol->npcID != npc.getID())
 	{
+		const auto path = transientNPCPaths_.find(npc.getID());
+		if (path != transientNPCPaths_.end() && path->second == pathId)
+		{
+			if (npcs_)
+			{
+				npcs_->destroyPath(pathId);
+			}
+			transientNPCPaths_.erase(path);
+			const auto route = transientRoutes_.find(npc.getID());
+			if (route != transientRoutes_.end())
+			{
+				destroyRoute(route->second);
+				transientRoutes_.erase(route);
+			}
+		}
 		return;
 	}
 
@@ -925,6 +1091,27 @@ void PathModule::onNPCCreate(INPC&)
 
 void PathModule::onNPCDestroy(INPC& npc)
 {
+	const int npcID = npc.getID();
+	const auto path = transientNPCPaths_.find(npcID);
+	if (path != transientNPCPaths_.end())
+	{
+		npcs_->destroyPath(path->second);
+		transientNPCPaths_.erase(path);
+	}
+	const auto route = transientRoutes_.find(npcID);
+	if (route != transientRoutes_.end())
+	{
+		destroyRoute(route->second);
+		transientRoutes_.erase(route);
+	}
+	for (auto& item : patrols_)
+	{
+		if (item.second.npcID == npcID)
+		{
+			item.second.active = false;
+			item.second.npcPathID = -1;
+		}
+	}
 	npcSpatialEntries_.erase(npc.getID());
 	npcSpatialDirty_ = true;
 }

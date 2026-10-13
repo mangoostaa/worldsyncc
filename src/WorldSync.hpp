@@ -78,6 +78,7 @@ public:
 	virtual void onEntityCreated(const Entity& entity) {}
 	virtual void onEntityDestroyed(int entityID, const std::string& type) {}
 	virtual void onEntityStateChanged(const Entity& entity, const std::string& key, const std::string& oldValue, const std::string& newValue) {}
+	virtual void onEntityPositionChanged(const Entity& entity) {}
 	virtual void onWorldLoaded(int entityCount, bool storageAvailable) {}
 	virtual void onWorldSaved(int entityCount, int changedCount, bool dirtyOnly) {}
 };

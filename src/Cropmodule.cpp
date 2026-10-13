@@ -119,6 +119,11 @@ bool CropModule::setGrowth(int cropID, int value)
     const int clamped = std::clamp(value, 0, 100);
     setInt(cropID, CROP_KEY_GROWTH, clamped);
 
+    if (clamped < 100)
+    {
+        setInt(cropID, CROP_KEY_READY, 0);
+    }
+
     // Si se fuerza a 100 manualmente, marcar como listo y notificar
     if (clamped == 100 && getInt(cropID, CROP_KEY_READY, 0) == 0)
     {
