@@ -245,6 +245,14 @@ bool PathModule::isNode(int nodeID) const
 
 int PathModule::createObstacle(Vec3 position, float width, float depth, float margin, int virtualWorld, int interior)
 {
+	if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
+	{
+		return 0;
+	}
+	if (!std::isfinite(width) || !std::isfinite(depth) || !std::isfinite(margin))
+	{
+		return 0;
+	}
 	if (width <= 0.0f || depth <= 0.0f || margin < 0.0f)
 	{
 		return 0;
